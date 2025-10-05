@@ -1,81 +1,240 @@
+from datetime import datetime,timedelta,date
+
+# Current time with hours:minutes:seconds
+print(datetime.now().strftime("%H:%M:%S"))
+
 import pandas as pd
-import math
-
+import math,time,os
 from nsepython import nse_eq, nse_optionchain_scrapper, fnolist, nsesymbolpurify
-import time, os
+from bs4 import BeautifulSoup
+from urllib.request import urlopen, Request
+from jugaad_data.nse import stock_df
+from ta.momentum import RSIIndicator
+from ta.trend import MACD
+from datetime import date
+from tqdm import tqdm
+import gc
 
-lines = []
-Headers = "Expiry,Symbol,PCR,CMP,Support,Dist_From_Support,Resistance,Dist_From_Resistance,Max_OI_Strike,Prev Close,Close"
-print(Headers)
-lines.append(Headers)
+import concurrent.futures
 
-def collect_opc_data(symbol, exp) :
-    # call the nse_eq function to get basic equity info
-    data = nse_eq(symbol)
+def run_with_timeout(func, timeout=10, *args, **kwargs):
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            print("Timeout! Skipping...")
+            return -1,0,0
 
-    # create some variables to print based on the data from the nse_eq
-    ltp = data['priceInfo']['lastPrice']
-    prev_close = data['priceInfo']['previousClose']
-    close = data['priceInfo']['close']
+# Format as dd-MMM-yyyy
+formatted_date = datetime.now().strftime("%d-%b-%Y")
 
-    opcdata = nse_optionchain_scrapper(symbol)
+# Initialize an empty DataFrame
+whole_df = pd.DataFrame()
 
-    records = opcdata['records']['data']
+# List of current Holdings
+HLDNGS = ["ABB", "BEL", "BSE", "CAMS", "CDSL", "CGPOWER", "COALINDIA", "IEX", "INDIGO", "IRCTC", "KFINTECH", "MCX","MOTHERSON", "PFC", "POWERGRID", "SIEMENS"]
 
-    chain_data = []
-    for item in records:
-        strike = item.get("strikePrice")
-        expiry = item.get("expiryDate")
-        
-        if exp != expiry:
-            continue
+ed = datetime.now().date()
+sd = ed - timedelta(days=365)
 
-        ce = item.get("CE", {})
-        pe = item.get("PE", {})
+# Define function for getting the symbol's PE and Book Value from Screener.in
+# input arg : Symbol
+# returns: pe and bv
 
-        chain_data.append({
-            "expiryDate": expiry,
-            "strikePrice": strike,
-            "CE_openInterest": ce.get("openInterest"),
-            #"CE_changeOI": ce.get("changeinOpenInterest"),
-            "CE_lastPrice": ce.get("lastPrice"),
-            "PE_openInterest": pe.get("openInterest"),
-            #"PE_changeOI": pe.get("changeinOpenInterest"),
-            "PE_lastPrice": pe.get("lastPrice"),
-        })
+def mcap_pe(scrip):
+    SCRIP = scrip
+    link = f'https://www.screener.in/company/{SCRIP}'
+    hdr = {'User-Agent':'Mozilla/5.0'}
+    req = Request(link,headers=hdr)
 
-    df = pd.DataFrame(chain_data).sort_values(["CE_openInterest", "PE_openInterest"])
+    try:
+        page=urlopen(req)
+        soup = BeautifulSoup(page, "html.parser")
 
-    df["CE_PE_Total"] = df["CE_openInterest"] + df["PE_openInterest"]
-    df_Specific_Exp = df[df.expiryDate == exp]
-    Total_Puts = df_Specific_Exp.PE_openInterest.sum()
-    Total_Calls = df_Specific_Exp.CE_openInterest.sum()
-    PCR = Total_Puts/Total_Calls
-    max_oi_row = df_Specific_Exp.loc[df_Specific_Exp['CE_PE_Total'].idxmax()]
+        div_html = soup.find('div',{'class': 'company-ratios'})
+        ul_html = div_html.find('ul',{'id': 'top-ratios'})
+        market_cap = 0.0
 
-    Support = max_oi_row["strikePrice"] - max_oi_row["CE_lastPrice"] - max_oi_row["PE_lastPrice"]
-    Resistance = max_oi_row["strikePrice"] + max_oi_row["CE_lastPrice"] + max_oi_row["PE_lastPrice"]
-    Dist_from_Support = ((ltp - Support)/Support) * 100
-    Dist_from_Resist = ((Resistance - ltp)/ltp) * 100
+        for li in ul_html.find_all("li"):
+            name_span = li.find('span',{'class':'name'})
+            """
+            if 'Market Cap' in name_span.text: 
+                num_span = li.find('span',{'class':'number'})
+                num_span = num_span.text.replace(',', '')
+                market_cap = float(num_span) if (num_span != '') else 0.0
+            """
+            if 'Stock P/E' in name_span.text: 
+                num_span = li.find('span',{'class':'number'})
+                num_span = num_span.text.replace(',', '')
+                stock_pe = float(num_span) if (num_span != '') else 0.0
+            elif 'Book Value' in name_span.text: 
+                num_span = li.find('span',{'class':'number'})
+                num_span = num_span.text.replace(',', '')
+                book_value = float(num_span) if (num_span != '') else 0.0
+                break
 
-    rfh = f"{exp},{symbol},{round(PCR, 2)},{ltp},{Support},{math.ceil(Dist_from_Support * 100)/100},"
-    rsh = f"{Resistance},{math.ceil(Dist_from_Resist * 100)/100},{max_oi_row.strikePrice},{prev_close},{close}"
-    print(rfh+rsh)
-    
-    row = rfh + rsh
-    lines.append(row)
+        return stock_pe, book_value
+
+    except Exception as e:
+        print(f'EXCEPTION THROWN: UNABLE TO FETCH DATA FOR {SCRIP}: {e}')
+        return 0
+
+def cal_rsi_macd(hld, cls_prc_str='CLOSE'):
+	rsi_msi_df = pd.DataFrame()
+	gc.collect()
+	hld='M&M' if hld== 'M%26M' else hld
+	rsi_msi_df = stock_df(symbol=hld, from_date=date(sd.year, sd.month, sd.day), to_date=date(ed.year, ed.month, ed.day), series="EQ")
+	rsi_msi_df.sort_values(by='DATE',inplace=True)
+	
+	# Calculate 14-day RSI
+	rsi_indicator = RSIIndicator(close=rsi_msi_df[cls_prc_str], window=14)
+	rsi_msi_df['RSI'] = rsi_indicator.rsi()
+		
+	# Calculate MACD
+	macd_indicator = MACD(
+	    close=rsi_msi_df[cls_prc_str],
+	    window_slow=26,  # Default: 26-period Exponential Moving Average (EMA)
+	    window_fast=12,  # Default: 12-period EMA
+	    window_sign=9    # Default: 9-period EMA for the signal line
+	)
+	rsi_msi_df['MACD'] = macd_indicator.macd()
+	rsi_msi_df['MACD_Signal'] = macd_indicator.macd_signal()
+	
+	#print(rsi_msi_df[[cls_prc_str, 'RSI', 'MACD', 'MACD_Signal']])
+	#print(type(rsi_msi_df.iloc[-1].RSI))
+	return rsi_msi_df.iloc[-1].RSI, rsi_msi_df.iloc[-1].MACD, rsi_msi_df.iloc[-1].MACD_Signal
 
 
-exp = "30-Sep-2025"
+def collect_opc_data(symbol) :
+	try:
+		with tqdm(total=7, desc="Pipeline Progress", unit="step", leave=False) as pbar:
+		    global whole_df
+		    # call the nse_eq function to get basic equity info
+		    data = nse_eq(symbol)
+		    pbar.update(1)
+		
+		    # create some variables to print based on the data from the nse_eq
+		    ltp = data['priceInfo']['lastPrice']
+		    macro = data['industryInfo']['macro']
+		    sector = data['industryInfo']['sector']
+		    industry = data['industryInfo']['industry']
+		    basicIndustry = data['industryInfo']['basicIndustry']
+		    
+		    #RSI, MACD, MACD_Signal = cal_rsi_macd(symbol)
+		    RSI, MACD, MACD_Signal = run_with_timeout(cal_rsi_macd, hld=symbol)
+		    if RSI == -1:
+		    	return
+		    pbar.update(1)
+		    stock_pe_ratio, stock_bv = mcap_pe(symbol)
+		    pbar.update(1)
+		
+		    opcdata = nse_optionchain_scrapper(symbol)
+		    pbar.update(1)
+		    
+		    records = opcdata['records']['data']
+		    #PCR = opc['filtered']['PE']['totOI']/opcdata['filtered']['CE']['totOI']
+		    
+		    hld_yrn = "Holding" if symbol in HLDNGS else "Non-Hld"
+		
+		    chain_data = []
+		    for item in records:
+		        strike = item.get("strikePrice")
+		        expiry = item.get("expiryDate")
+	
+		        ce = item.get("CE", {})
+		        pe = item.get("PE", {})
+		        ce_oi = ce.get("openInterest")
+		        if ce_oi == None:
+		        	ce_oi = 0
+		        
+		        pe_oi = pe.get("openInterest")
+		        if pe_oi == None:
+		        	pe_oi = 0
+		        
+		        ce_ltp_at_strk = ce.get("lastPrice")
+		        if ce_ltp_at_strk == None:
+		        	ce_ltp_at_strk = 0
+		        
+		        pe_ltp_at_strk = pe.get("lastPrice")
+		        if pe_ltp_at_strk == None:
+		        	pe_ltp_at_strk = 0
+	
+		        CE_PE_Total = ce_oi + pe_oi
+		        Support = strike - (ce_ltp_at_strk + pe_ltp_at_strk)
+		        Resistance = strike + (ce_ltp_at_strk + pe_ltp_at_strk)
+		        Dist_from_Support = ((ltp - Support)/Support) * 100
+		        Dist_from_Resist = ((Resistance - ltp)/ltp) * 100	        
+		
+		        chain_data.append({
+		            "Date" : formatted_date,
+		            "expiryDate": expiry,
+		            "Symbol" : symbol,
+		            "Type" : hld_yrn,
+		            "CMP" : ltp,
+		            "Stock PE" : stock_pe_ratio ,
+		            "BV-to-CMP" : ltp/stock_bv,
+		            "RSI" : RSI,
+		            "MACD" : MACD,
+		            "MACD_Signal" : MACD_Signal,
+		            "strikePrice": strike,
+		            "CE_openInterest": ce_oi,
+		            #"CE_changeOI": ce.get("changeinOpenInterest"),
+		            #"CE_lastPrice": ce_ltp_at_strk,
+		            "PE_openInterest": pe_oi,
+		            #"PE_changeOI": pe.get("changeinOpenInterest"),
+		            #"PE_lastPrice": pe_ltp_at_strk,
+		            "CE_PE_Total": CE_PE_Total,
+		            "Support" : Support,
+		            "Dist_from_Support" : math.ceil(Dist_from_Support * 100)/100,
+		            "Resistance" : Resistance,
+		            "Dist_from_Resist" : math.ceil(Dist_from_Resist * 100)/100,
+		            #"PCR" : PCR,
+		            "Macro": macro,
+		            "Sector": sector,
+		            "Industry": industry,
+		            "Basic Industry": basicIndustry,
+		        })
+		
+		    df = pd.DataFrame(chain_data)
+		    pbar.update(1)
+		    
+		    df_max_oi_tbl = df.loc[df.groupby("expiryDate")["CE_PE_Total"].idxmax()]
+		    
+		    expdlst =[]
+		    expdpcrlst =[]
+		    for expd in df_max_oi_tbl["expiryDate"]:
+		    	Total_Puts = df[df.expiryDate == expd].PE_openInterest.sum()
+		    	Total_Calls = df[df.expiryDate == expd].CE_openInterest.sum()
+		    	if Total_Calls == 0:
+		    		PCR = 0
+		    	else:
+		    		PCR = Total_Puts/Total_Calls
+		    	expdlst.append(expd)
+		    	expdpcrlst.append(PCR)
+		    
+		    pbar.update(1)	
+		    expdpcrdf = pd.DataFrame({"expiryDate":expdlst, "PCR":expdpcrlst})
+		    merged = pd.merge(df_max_oi_tbl, expdpcrdf, on="expiryDate", how="inner")
+		    whole_df = pd.concat([whole_df, merged], ignore_index=True)
+		    pbar.update(1)
+		    return
+		    
+	except Exception as e:
+		print(f"Error with symbol {symbol} {e}")
+		return
+
+
 symbols=[]
-
-ip = input("Select 1 - Holdings Symbols, 2 - All FnO Symbols: ")
+file_name = ""
+ip = input("Select: 1 - Holdings Symbols, 2 - All FnO Symbols: ")
 if 1 == int(ip):
-    print("selected Hlds")
-    symbols = ["ABB", "BEL", "BSE", "CAMS", "CDSL", "CGPOWER", "COALINDIA", "IEX", "INDIGO", "IRCTC", "KFINTECH", "MCX", 
-           "MOTHERSON", "PFC", "POWERGRID", "SIEMENS"]
+    print("Selected Hlds")
+    file_name = "MyHoldings_Opc.csv"
+    symbols=HLDNGS.copy()
 elif 2 == int(ip):
-    print("selected All FnO")
+    print("Selected All FnO")
+    file_name = "AllFnOStocks_Opc.csv"
     symbols=sorted(fnolist())
     symbols.remove('NIFTY')
     symbols.remove('NIFTYIT')
@@ -83,25 +242,31 @@ elif 2 == int(ip):
 else:
     print("Error: Select either 1 or 2")
     exit(0)
-   
-for symbol in symbols:
-    symbol=nsesymbolpurify(symbol)
-    collect_opc_data(symbol=symbol, exp=exp)
-    time.sleep(3)
+
 
 if os.name == 'nt':
-    fp = os.getcwd() +"\\allSym_Opc"+"_"+exp+".csv"
+    fp = os.getcwd() +"\\"+file_name
 elif os.name == 'posix':
-    fp = os.getcwd() +"/allSym_Opc"+"_"+exp+".csv"
+    fp = os.getcwd() +"/"+file_name
 else:
     print("unknown OS. Change code to use this")
     exit(0)
 
+md = 'w'
+header = True
+if os.path.exists(fp):
+    ip=input(f"File {file_name} exists.\nDefault is Overwrite. Select 1 - to just append : ")
+    if ip == 1:
+    	md = 'a'
+    	header = False
+
+for symbol in symbols:
+    symbol=nsesymbolpurify(symbol)
+    collect_opc_data(symbol=symbol)
+    print(f"Done with symbol {symbol}")
+    time.sleep(2)
+
 print(f"Writing into the file {fp}")
-
-with open(fp, "w") as f:
-    for line in lines:
-        f.write(line + "\n")
-
-f.close()
+whole_df.to_csv(fp, mode=md, header=header, index=False)
 print("Completed writing")
+print(datetime.now().strftime("%H:%M:%S"))

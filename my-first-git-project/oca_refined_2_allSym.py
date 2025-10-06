@@ -1,7 +1,7 @@
 from datetime import datetime,timedelta,date
 
 # Current time with hours:minutes:seconds
-print(datetime.now().strftime("%H:%M:%S"))
+print("\n\t\tTime Start: " + datetime.now().strftime("%H:%M:%S") + "\n")
 
 import pandas as pd
 import math,time,os
@@ -107,142 +107,133 @@ def cal_rsi_macd(hld, cls_prc_str='CLOSE'):
 
 
 def collect_opc_data(symbol) :
-	try:
-		with tqdm(total=7, desc="Pipeline Progress", unit="step", leave=False) as pbar:
-		    global whole_df
-		    # call the nse_eq function to get basic equity info
-		    data = nse_eq(symbol)
-		    pbar.update(1)
-		
-		    # create some variables to print based on the data from the nse_eq
-		    ltp = data['priceInfo']['lastPrice']
-		    macro = data['industryInfo']['macro']
-		    sector = data['industryInfo']['sector']
-		    industry = data['industryInfo']['industry']
-		    basicIndustry = data['industryInfo']['basicIndustry']
+     max_retries = 3
+     attempt = 0
+     while attempt < max_retries:
+           try:
+                 with tqdm(total=7, desc="Pipeline Progress", unit="step", leave=False) as pbar:
+                       global whole_df
+                       data = nse_eq(symbol)
+                       pbar.update(1)
+                       ltp = data['priceInfo']['lastPrice']
+                       macro = data['industryInfo']['macro']
+                       sector = data['industryInfo']['sector']
+                       industry = data['industryInfo']['industry']
+                       basicIndustry = data['industryInfo']['basicIndustry']
+                       RSI, MACD, MACD_Signal = run_with_timeout(cal_rsi_macd, hld=symbol)
+                       if RSI == -1:
+                              return
+                       pbar.update(1)
+                       stock_pe_ratio, stock_bv = mcap_pe(symbol)
+                       pbar.update(1)
+                       opcdata = nse_optionchain_scrapper(symbol)
+                       pbar.update(1)
+                       records = opcdata['records']['data']
+                       hld_yrn = "Holding" if symbol in HLDNGS else "Non-Hld"
+
+                       chain_data = []
+                       for item in records:
+                                    strike = item.get("strikePrice")
+                                    expiry = item.get("expiryDate")
+
+                                    ce = item.get("CE", {})
+                                    pe = item.get("PE", {})
+
+                                    ce_oi = 0 if ce.get("openInterest") == None else ce.get("openInterest")
+                                    pe_oi = 0 if pe.get("openInterest") == None else pe.get("openInterest")
+                                    CE_PE_Total = ce_oi + pe_oi
+
+                                    ce_ltp_at_strk = 0 if ce.get("lastPrice") == None else ce.get("lastPrice")
+                                    pe_ltp_at_strk = 0 if pe.get("lastPrice") == None else pe.get("lastPrice")
+                                    Support = strike - (ce_ltp_at_strk + pe_ltp_at_strk)
+                                    Resistance = strike + (ce_ltp_at_strk + pe_ltp_at_strk)
+                                    Dist_from_Support = ((ltp - Support)/Support) * 100
+                                    Dist_from_Resist = ((Resistance - ltp)/ltp) * 100	        
+
+                                    chain_data.append({
+                                         "Date" : formatted_date,
+                                         "expiryDate": expiry,
+                                         "Symbol" : symbol,
+                                         "Type" : hld_yrn,
+                                         "CMP" : ltp,
+                                         "Stock PE" : stock_pe_ratio ,
+                                         "BV-to-CMP" : ltp/stock_bv,
+                                         "RSI" : RSI,
+                                         "MACD" : MACD,
+                                         "MACD_Signal" : MACD_Signal,
+                                         "strikePrice": strike,
+                                         "CE_openInterest": ce_oi,
+                                         #"CE_changeOI": ce.get("changeinOpenInterest"),
+                                         #"CE_lastPrice": ce_ltp_at_strk,
+                                         "PE_openInterest": pe_oi,
+                                         #"PE_changeOI": pe.get("changeinOpenInterest"),
+                                         #"PE_lastPrice": pe_ltp_at_strk,
+                                         "CE_PE_Total": CE_PE_Total,
+                                         "Support" : Support,
+                                         "Dist_from_Support" : math.ceil(Dist_from_Support * 100)/100,
+                                         "Resistance" : Resistance,
+                                         "Dist_from_Resist" : math.ceil(Dist_from_Resist * 100)/100,
+                                         #"PCR" : PCR,
+                                         "Macro": macro,
+                                         "Sector": sector,
+                                         "Industry": industry,
+                                         "Basic Industry": basicIndustry,
+                                    })
+
+                                    df = pd.DataFrame(chain_data)
+                                    pbar.update(1)
+
+                                    df_max_oi_tbl = df.loc[df.groupby("expiryDate")["CE_PE_Total"].idxmax()]
+
+                                    expdlst =[]
+                                    expdpcrlst =[]
+                                    for expd in df_max_oi_tbl["expiryDate"]:
+                                          Total_Puts = df[df.expiryDate == expd].PE_openInterest.sum()
+                                          Total_Calls = df[df.expiryDate == expd].CE_openInterest.sum()
+                                          if Total_Calls == 0:
+                                                PCR = 0
+                                          else:
+                                                PCR = Total_Puts/Total_Calls
+                                          expdlst.append(expd)
+                                          expdpcrlst.append(PCR)
+
+                                    pbar.update(1)	
+                                    expdpcrdf = pd.DataFrame({"expiryDate":expdlst, "PCR":expdpcrlst})
+                                    merged = pd.merge(df_max_oi_tbl, expdpcrdf, on="expiryDate", how="inner")
+                                    whole_df = pd.concat([whole_df, merged], ignore_index=True)
+                                    pbar.update(1)
+                                    return
 		    
-		    #RSI, MACD, MACD_Signal = cal_rsi_macd(symbol)
-		    RSI, MACD, MACD_Signal = run_with_timeout(cal_rsi_macd, hld=symbol)
-		    if RSI == -1:
-		    	return
-		    pbar.update(1)
-		    stock_pe_ratio, stock_bv = mcap_pe(symbol)
-		    pbar.update(1)
-		
-		    opcdata = nse_optionchain_scrapper(symbol)
-		    pbar.update(1)
-		    
-		    records = opcdata['records']['data']
-		    #PCR = opc['filtered']['PE']['totOI']/opcdata['filtered']['CE']['totOI']
-		    
-		    hld_yrn = "Holding" if symbol in HLDNGS else "Non-Hld"
-		
-		    chain_data = []
-		    for item in records:
-		        strike = item.get("strikePrice")
-		        expiry = item.get("expiryDate")
-	
-		        ce = item.get("CE", {})
-		        pe = item.get("PE", {})
-		        ce_oi = ce.get("openInterest")
-		        if ce_oi == None:
-		        	ce_oi = 0
-		        
-		        pe_oi = pe.get("openInterest")
-		        if pe_oi == None:
-		        	pe_oi = 0
-		        
-		        ce_ltp_at_strk = ce.get("lastPrice")
-		        if ce_ltp_at_strk == None:
-		        	ce_ltp_at_strk = 0
-		        
-		        pe_ltp_at_strk = pe.get("lastPrice")
-		        if pe_ltp_at_strk == None:
-		        	pe_ltp_at_strk = 0
-	
-		        CE_PE_Total = ce_oi + pe_oi
-		        Support = strike - (ce_ltp_at_strk + pe_ltp_at_strk)
-		        Resistance = strike + (ce_ltp_at_strk + pe_ltp_at_strk)
-		        Dist_from_Support = ((ltp - Support)/Support) * 100
-		        Dist_from_Resist = ((Resistance - ltp)/ltp) * 100	        
-		
-		        chain_data.append({
-		            "Date" : formatted_date,
-		            "expiryDate": expiry,
-		            "Symbol" : symbol,
-		            "Type" : hld_yrn,
-		            "CMP" : ltp,
-		            "Stock PE" : stock_pe_ratio ,
-		            "BV-to-CMP" : ltp/stock_bv,
-		            "RSI" : RSI,
-		            "MACD" : MACD,
-		            "MACD_Signal" : MACD_Signal,
-		            "strikePrice": strike,
-		            "CE_openInterest": ce_oi,
-		            #"CE_changeOI": ce.get("changeinOpenInterest"),
-		            #"CE_lastPrice": ce_ltp_at_strk,
-		            "PE_openInterest": pe_oi,
-		            #"PE_changeOI": pe.get("changeinOpenInterest"),
-		            #"PE_lastPrice": pe_ltp_at_strk,
-		            "CE_PE_Total": CE_PE_Total,
-		            "Support" : Support,
-		            "Dist_from_Support" : math.ceil(Dist_from_Support * 100)/100,
-		            "Resistance" : Resistance,
-		            "Dist_from_Resist" : math.ceil(Dist_from_Resist * 100)/100,
-		            #"PCR" : PCR,
-		            "Macro": macro,
-		            "Sector": sector,
-		            "Industry": industry,
-		            "Basic Industry": basicIndustry,
-		        })
-		
-		    df = pd.DataFrame(chain_data)
-		    pbar.update(1)
-		    
-		    df_max_oi_tbl = df.loc[df.groupby("expiryDate")["CE_PE_Total"].idxmax()]
-		    
-		    expdlst =[]
-		    expdpcrlst =[]
-		    for expd in df_max_oi_tbl["expiryDate"]:
-		    	Total_Puts = df[df.expiryDate == expd].PE_openInterest.sum()
-		    	Total_Calls = df[df.expiryDate == expd].CE_openInterest.sum()
-		    	if Total_Calls == 0:
-		    		PCR = 0
-		    	else:
-		    		PCR = Total_Puts/Total_Calls
-		    	expdlst.append(expd)
-		    	expdpcrlst.append(PCR)
-		    
-		    pbar.update(1)	
-		    expdpcrdf = pd.DataFrame({"expiryDate":expdlst, "PCR":expdpcrlst})
-		    merged = pd.merge(df_max_oi_tbl, expdpcrdf, on="expiryDate", how="inner")
-		    whole_df = pd.concat([whole_df, merged], ignore_index=True)
-		    pbar.update(1)
-		    return
-		    
-	except Exception as e:
-		print(f"Error with symbol {symbol} {e}")
-		return
+           except Exception as e:
+                 attempt += 1
+                 if attempt < max_retries:
+                       print(f"{attempt} Failed with symbol {symbol} {e}. Retrying")
+                 else:
+                       print(f"Max tries of {max_retries} reached. Seeing Error: {e}. Exiting")
+                       return
+                        
 
 
 symbols=[]
 file_name = ""
-ip = input("Select: 1 - Holdings Symbols, 2 - All FnO Symbols: ")
-if 1 == int(ip):
-    print("Selected Hlds")
-    file_name = "MyHoldings_Opc.csv"
-    symbols=HLDNGS.copy()
-elif 2 == int(ip):
-    print("Selected All FnO")
-    file_name = "AllFnOStocks_Opc.csv"
-    symbols=sorted(fnolist())
-    symbols.remove('NIFTY')
-    symbols.remove('NIFTYIT')
-    symbols.remove('BANKNIFTY')
-else:
-    print("Error: Select either 1 or 2")
-    exit(0)
-
+printstr = "\n--------------->>>>"
+while True:
+    ip = input("Select: 1 - Holdings Symbols, 2 - All FnO Symbols : ")
+    if 1 == int(ip):
+        print(f"{printstr} Selected Holdings")
+        file_name = "MyHoldings_Opc.csv"
+        symbols=HLDNGS.copy()
+        break
+    elif 2 == int(ip):
+        print(f"{printstr} Selected All FnO Symbols")
+        file_name = "AllFnOStocks_Opc.csv"
+        symbols=sorted(fnolist())
+        symbols.remove('NIFTY')
+        symbols.remove('NIFTYIT')
+        symbols.remove('BANKNIFTY')
+        break
+    else:
+        print(f"{printstr} Wrong Selection.\n")
 
 if os.name == 'nt':
     fp = os.getcwd() +"\\"+file_name
@@ -254,11 +245,23 @@ else:
 
 md = 'w'
 header = True
-if os.path.exists(fp):
-    ip=input(f"File {file_name} exists.\nDefault is Overwrite. Select 1 - to just append : ")
-    if ip == 1:
-    	md = 'a'
-    	header = False
+while True:
+    if os.path.exists(fp):
+        ip=input(f"File {file_name} exists.\n\nDefault is Overwrite. Select 1 - to just append , 2 - to create a new file with timestamp: ")
+        if int(ip) == 1:
+            md = 'a'
+            header = False
+            break
+        elif int(ip) == 2:
+            fp = fp.replace(".csv", "_" + datetime.now().strftime("%H_%M_%S") + ".csv")
+            break
+        else:
+            print(f"{printstr} Wrong Selection.\n")
+    else:
+         print(f"File {file_name} doesnt exist. Will create it after processing the data\n")
+         break
+
+print(f"{printstr} Found total {len(symbols)} Symbols\n")
 
 for symbol in symbols:
     symbol=nsesymbolpurify(symbol)

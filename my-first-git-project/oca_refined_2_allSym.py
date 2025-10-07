@@ -58,12 +58,6 @@ def mcap_pe(scrip):
 
         for li in ul_html.find_all("li"):
             name_span = li.find('span',{'class':'name'})
-            """
-            if 'Market Cap' in name_span.text: 
-                num_span = li.find('span',{'class':'number'})
-                num_span = num_span.text.replace(',', '')
-                market_cap = float(num_span) if (num_span != '') else 0.0
-            """
             if 'Stock P/E' in name_span.text: 
                 num_span = li.find('span',{'class':'number'})
                 num_span = num_span.text.replace(',', '')
@@ -180,29 +174,30 @@ def collect_opc_data(symbol) :
                                          "Basic Industry": basicIndustry,
                                     })
 
-                                    df = pd.DataFrame(chain_data)
-                                    pbar.update(1)
+                       df = pd.DataFrame(chain_data)
+                       pbar.update(1)
 
-                                    df_max_oi_tbl = df.loc[df.groupby("expiryDate")["CE_PE_Total"].idxmax()]
+                       df_max_oi_tbl = df.loc[df.groupby("expiryDate")["CE_PE_Total"].idxmax()]
 
-                                    expdlst =[]
-                                    expdpcrlst =[]
-                                    for expd in df_max_oi_tbl["expiryDate"]:
-                                          Total_Puts = df[df.expiryDate == expd].PE_openInterest.sum()
-                                          Total_Calls = df[df.expiryDate == expd].CE_openInterest.sum()
-                                          if Total_Calls == 0:
-                                                PCR = 0
-                                          else:
-                                                PCR = Total_Puts/Total_Calls
-                                          expdlst.append(expd)
-                                          expdpcrlst.append(PCR)
+                       expdlst =[]
+                       expdpcrlst =[]
+                       for expd in df_max_oi_tbl["expiryDate"]:
+                             Total_Puts = df[df.expiryDate == expd].PE_openInterest.sum()
+                             Total_Calls = df[df.expiryDate == expd].CE_openInterest.sum()
+                             if Total_Calls == 0:
+                                   PCR = 0
+                             else:
+                                   PCR = Total_Puts/Total_Calls
+                             expdlst.append(expd)
+                             expdpcrlst.append(PCR)
 
-                                    pbar.update(1)	
-                                    expdpcrdf = pd.DataFrame({"expiryDate":expdlst, "PCR":expdpcrlst})
-                                    merged = pd.merge(df_max_oi_tbl, expdpcrdf, on="expiryDate", how="inner")
-                                    whole_df = pd.concat([whole_df, merged], ignore_index=True)
-                                    pbar.update(1)
-                                    return
+                       pbar.update(1)	
+
+                       expdpcrdf = pd.DataFrame({"expiryDate":expdlst, "PCR":expdpcrlst})
+                       merged = pd.merge(df_max_oi_tbl, expdpcrdf, on="expiryDate", how="inner")
+                       whole_df = pd.concat([whole_df, merged], ignore_index=True)
+                       pbar.update(1)
+                       return
 		    
            except Exception as e:
                  attempt += 1

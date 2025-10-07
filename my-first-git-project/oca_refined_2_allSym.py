@@ -155,6 +155,7 @@ def collect_opc_data(symbol) :
                                          "RSI" : RSI,
                                          "MACD" : MACD,
                                          "MACD_Signal" : MACD_Signal,
+                                         "MACD_To_Signal" : MACD - MACD_Signal,
                                          "strikePrice": strike,
                                          "CE_openInterest": ce_oi,
                                          #"CE_changeOI": ce.get("changeinOpenInterest"),

@@ -285,7 +285,7 @@ print(f"Writing into the file {fp}")
 
 whole_df = whole_df[["Date", "expiryDate", "Symbol", "CMP", "RSI", 
                      "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", "strikePrice", "Comments",
-                     "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist"]]
+                     "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR"]]
                        
 whole_df.to_csv(fp, mode=md, header=header, index=False)
 print("Completed writing")

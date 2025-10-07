@@ -283,7 +283,7 @@ for symbol in symbols:
 
 print(f"Writing into the file {fp}")
 
-whole_df = whole_df[["Date", "expiryDate", "Symbol", "CMP", "RSI", 
+whole_df = whole_df[["Date", "expiryDate", "Symbol", "Type", "CMP", "Stock PE", "BV-to-CMP", "RSI", 
                      "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", "strikePrice", "Comments",
                      "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR"]]
                        

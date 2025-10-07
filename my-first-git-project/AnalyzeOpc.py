@@ -218,7 +218,9 @@ def collect_opc_data(symbol) :
                        print(f"Max tries of {max_retries} reached. Seeing Error: {e}. Exiting")
                        return "Fail"
                         
-
+headers_list = ["Date", "expiryDate", "Symbol", "Type", "CMP", "Stock PE", "BV-to-CMP", "RSI", 
+                     "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", "strikePrice", "Comments",
+                     "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR"]
 symbols=[]
 file_name = ""
 printstr = "\n--------------->>>>"
@@ -283,9 +285,7 @@ for symbol in symbols:
 
 print(f"Writing into the file {fp}")
 
-whole_df = whole_df[["Date", "expiryDate", "Symbol", "Type", "CMP", "Stock PE", "BV-to-CMP", "RSI", 
-                     "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", "strikePrice", "Comments",
-                     "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR"]]
+whole_df = whole_df[headers_list]
                        
 whole_df.to_csv(fp, mode=md, header=header, index=False)
 print("Completed writing")

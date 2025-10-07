@@ -11,7 +11,7 @@ df.sort_values(by=["Symbol", "Date"], inplace=True)
 df.reset_index(drop=True, inplace=True)
 
 # Define columns to analyze
-cols = ["RSI", "Support", "Resistance"]
+cols = ["RSI", "Support", "Resistance", "PCR"]
 
 # Group by Symbol and compute difference
 for col in cols:
@@ -20,9 +20,11 @@ for col in cols:
     df[col + "_trend"] = df[col + "_change"].apply(lambda x: "up" if x > 0 else ("down" if x < 0 else "unchanged"))
 
 trend_summary = df.groupby("Symbol").agg({
-    "RSI_trend": lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
-    "Support_trend": lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+    "RSI_trend":        lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+    "Support_trend":    lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
     "Resistance_trend": lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+    "PCR_trend":        lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+    
 })
 
 trend_summary.reset_index(inplace=True)

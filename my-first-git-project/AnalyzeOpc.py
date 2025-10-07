@@ -1,8 +1,5 @@
 from datetime import datetime,timedelta,date
 
-# Current time with hours:minutes:seconds
-print("\n\t\tTime Start: " + datetime.now().strftime("%H:%M:%S") + "\n")
-
 import pandas as pd
 import math,time,os
 from nsepython import nse_eq, nse_optionchain_scrapper, fnolist, nsesymbolpurify
@@ -155,12 +152,13 @@ def collect_opc_data(symbol) :
                                     pe_oi = 0 if pe.get("openInterest") == None else pe.get("openInterest")
                                     CE_PE_Total = ce_oi + pe_oi
 
-                                    ce_ltp_at_strk = 0 if ce.get("lastPrice") == None else ce.get("lastPrice")
-                                    pe_ltp_at_strk = 0 if pe.get("lastPrice") == None else pe.get("lastPrice")
-                                    Support = strike - (ce_ltp_at_strk + pe_ltp_at_strk)
-                                    Resistance = strike + (ce_ltp_at_strk + pe_ltp_at_strk)
+                                    clas = 0 if ce.get("lastPrice") == None else ce.get("lastPrice")
+                                    plas = 0 if pe.get("lastPrice") == None else pe.get("lastPrice")
+                                    Support = strike - (clas + plas)
+                                    Resistance = strike + (clas + plas)
                                     Dist_from_Support = ((ltp - Support)/Support) * 100
-                                    Dist_from_Resist = ((Resistance - ltp)/ltp) * 100	        
+                                    Dist_from_Resist = ((Resistance - ltp)/ltp) * 100
+                                    comments = "OI or Premium is 0" if any(v==0 for v in [ce_oi, pe_oi, clas, plas]) else "Proper"	        
 
                                     chain_data.append({
                                          "Date" : formatted_date,
@@ -175,6 +173,7 @@ def collect_opc_data(symbol) :
                                          "MACD_Signal" : MACD_Signal,
                                          "MACD_To_Signal" : MACD - MACD_Signal,
                                          "strikePrice": strike,
+                                         "Comments" : comments,
                                          "CE_openInterest": ce_oi,
                                          #"CE_changeOI": ce.get("changeinOpenInterest"),
                                          #"CE_lastPrice": ce_ltp_at_strk,
@@ -273,6 +272,9 @@ while True:
 
 print(f"{printstr} Found total {len(symbols)} Symbols.\n")
 
+# Current time with hours:minutes:seconds
+print("\n\t\tTime Start: " + datetime.now().strftime("%H:%M:%S") + "\n")
+
 for symbol in symbols:
     symbol=nsesymbolpurify(symbol)
     x = run_with_timeout(collect_opc_data, symbol=symbol)
@@ -282,7 +284,7 @@ for symbol in symbols:
 print(f"Writing into the file {fp}")
 
 whole_df = whole_df[["Date", "expiryDate", "Symbol", "CMP", "RSI", 
-                     "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", 
+                     "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", "strikePrice", "Comments",
                      "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist"]]
                        
 whole_df.to_csv(fp, mode=md, header=header, index=False)

@@ -44,7 +44,7 @@ sd = ed - timedelta(days=365)
 
 def mcap_pe(scrip):
     SCRIP = scrip
-    link = f'https://www.screener.in/company/{SCRIP}'
+    link = f'https://www.screener.in/company/{SCRIP}/#top'
     hdr = {'User-Agent':'Mozilla/5.0'}
     req = Request(link,headers=hdr)
 
@@ -208,7 +208,6 @@ def collect_opc_data(symbol) :
                        return
                         
 
-
 symbols=[]
 file_name = ""
 printstr = "\n--------------->>>>"
@@ -256,7 +255,7 @@ while True:
          print(f"File {file_name} doesnt exist. Will create it after processing the data\n")
          break
 
-print(f"{printstr} Found total {len(symbols)} Symbols\n")
+print(f"{printstr} Found total {len(symbols)} Symbols.\n")
 
 for symbol in symbols:
     symbol=nsesymbolpurify(symbol)

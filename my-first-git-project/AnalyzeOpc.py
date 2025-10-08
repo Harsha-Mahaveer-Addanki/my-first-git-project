@@ -33,8 +33,7 @@ whole_df = pd.DataFrame()
 # List of current Holdings
 HLDNGS = ["ABB", "BEL", "BSE", "CAMS", "CDSL", "CGPOWER", "COALINDIA", "IEX", "INDIGO", "IRCTC", "KFINTECH", "MCX","MOTHERSON", "PFC", "POWERGRID", "SIEMENS"]
 
-ed = datetime.now().date()
-sd = ed - timedelta(days=365)
+
 
 # Define function for getting the symbol's PE and Book Value from Screener.in
 # input arg : Symbol
@@ -263,16 +262,21 @@ while True:
          print(f"{printstr} Wrong Selection.\n")
     elif 1 == int(ip):
         print(f"{printstr} Selected MACD(12,26,9)")
+        days = 365
         break
     elif 2 == int(ip):
         print(f"{printstr} Selected MACD(50,200,25)")
         fast = 50
         slow = 200
         sign = 25
+        days = 1000
         fp = fp.replace(".csv", "_MACD_50_200_25.csv")
         break
     else:
         print(f"{printstr} Wrong Selection.\n")
+
+ed = datetime.now().date()
+sd = ed - timedelta(days=days)
 
 md = 'w'
 header = True

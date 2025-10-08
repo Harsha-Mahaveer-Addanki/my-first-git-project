@@ -73,6 +73,7 @@ def mcap_pe(scrip):
         return 0
 
 def cal_rsi_macd(hld, cls_prc_str='CLOSE'):
+    global fast, slow, sign
     rmdf = pd.DataFrame()
     gc.collect()
     hld='M&M' if hld== 'M%26M' else hld
@@ -86,9 +87,9 @@ def cal_rsi_macd(hld, cls_prc_str='CLOSE'):
 	# Calculate MACD
     macd_indicator = MACD(
 	    close=rmdf[cls_prc_str],
-	    window_slow=26,  # Default: 26-period Exponential Moving Average (EMA)
-	    window_fast=12,  # Default: 12-period EMA
-	    window_sign=9    # Default: 9-period EMA for the signal line
+	    window_slow=slow,  # Default: 26-period Exponential Moving Average (EMA)
+	    window_fast=fast,  # Default: 12-period EMA
+	    window_sign=sign    # Default: 9-period EMA for the signal line
 	)
     rmdf['MACD'] = macd_indicator.macd()
     rmdf['MACD_Signal'] = macd_indicator.macd_signal()
@@ -225,7 +226,7 @@ symbols=[]
 file_name = ""
 printstr = "\n--------------->>>>"
 while True:
-    ip = input("Select: 1 - Holdings Symbols, 2 - All FnO Symbols : ")
+    ip = input(f"{printstr} Select: 1 - Holdings Symbols, 2 - All FnO Symbols : ")
     if ip.strip() == "":
          print(f"{printstr} Wrong Selection.\n")
     elif 1 == int(ip):
@@ -252,11 +253,32 @@ else:
     print("unknown OS. Change code to use this")
     exit(0)
 
+fast=12
+slow=26
+sign=9
+
+while True:
+    ip = input(f"{printstr} Select MACD: 1 - 12,29,9 ---- 2 - 50,200,25 : ")
+    if ip.strip() == "":
+         print(f"{printstr} Wrong Selection.\n")
+    elif 1 == int(ip):
+        print(f"{printstr} Selected MACD(12,26,9)")
+        break
+    elif 2 == int(ip):
+        print(f"{printstr} Selected MACD(50,200,25)")
+        fast = 50
+        slow = 200
+        sign = 25
+        fp = fp.replace(".csv", "_MACD_50_200_25.csv")
+        break
+    else:
+        print(f"{printstr} Wrong Selection.\n")
+
 md = 'w'
 header = True
 while True:
     if os.path.exists(fp):
-        ip=input(f"File {file_name} exists.\n\nDefault is Overwrite. Select 1 - to just append , 2 - to create a new file with timestamp: ")
+        ip=input(f"{printstr} File {fp} exists.\n\nDefault is Overwrite. Select 1 - to just append , 2 - to create a new file with timestamp: ")
         if ip.strip() == "":
              break
         elif int(ip) == 1:
@@ -269,7 +291,7 @@ while True:
         else:
             print(f"{printstr} Wrong Selection.\n")
     else:
-         print(f"File {file_name} doesnt exist. Will create it after processing the data\n")
+         print(f"{printstr} File {fp} doesnt exist. Will create it after processing the data\n")
          break
 
 print(f"{printstr} Found total {len(symbols)} Symbols.\n")
@@ -277,10 +299,10 @@ print(f"{printstr} Found total {len(symbols)} Symbols.\n")
 # Current time with hours:minutes:seconds
 print("\n\t\tTime Start: " + datetime.now().strftime("%H:%M:%S") + "\n")
 
-for symbol in symbols:
+for symnum, symbol in enumerate(symbols, start=1):
     symbol=nsesymbolpurify(symbol)
     x = run_with_timeout(collect_opc_data, symbol=symbol)
-    x == "Success" and print(f"Done with symbol {symbol}")
+    x == "Success" and print(f"Done with symbol {symnum:>4} {symbol}")
     time.sleep(2)
 
 print(f"Writing into the file {fp}")

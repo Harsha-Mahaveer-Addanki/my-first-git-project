@@ -218,7 +218,12 @@ def collect_opc_data(symbol) :
                        print(f"Max tries of {max_retries} reached. Seeing Error: {e}. Exiting")
                        return "Fail"
 
-def trendAnalysis(fp):
+def Creat_fullReport_and_trendAnalysis(fp):
+    global whole_df
+    print(f"{printstr} Writing into the file {fp}")
+    whole_df = whole_df[headers_list]
+    whole_df.to_csv(fp, mode=md, header=header, index=False)
+    print(f"{printstr} Completed Writing\n")
 
     df = pd.read_csv(fp, parse_dates=["Date"], date_format="%d-%b-%y")
     fpa = fp.replace(".csv", "_trend_analysis.csv")
@@ -246,9 +251,13 @@ def trendAnalysis(fp):
 
     trend_summary.reset_index(inplace=True)
     #print(trend_summary)
-    print(f"{printstr} Writing into the file {fp}")
+    print(f"{printstr} Writing into the file {fpa}")
     trend_summary.to_csv(fpa, mode='w', header=True, index=False)
     print(f"{printstr} Completed Writing\n")
+
+    del whole_df
+    del df
+    gc.collect()
 
 
 
@@ -343,12 +352,7 @@ for symnum, symbol in enumerate(symbols, start=1):
     x == "Success" and print(f"Done with symbol {symnum:>4} {symbol}")
     time.sleep(2)
 
-print(f"Writing into the file {fp}")
-whole_df = whole_df[headers_list]
-whole_df.to_csv(fp, mode=md, header=header, index=False)
-print("Completed writing")
 
-
-trendAnalysis(fp)
+Creat_fullReport_and_trendAnalysis(fp)
 
 print(datetime.now().strftime("%H:%M:%S"))

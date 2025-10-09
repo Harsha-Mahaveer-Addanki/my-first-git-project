@@ -217,7 +217,41 @@ def collect_opc_data(symbol) :
                  else:
                        print(f"Max tries of {max_retries} reached. Seeing Error: {e}. Exiting")
                        return "Fail"
-                        
+
+def trendAnalysis(fp):
+
+    df = pd.read_csv(fp, parse_dates=["Date"], date_format="%d-%b-%y")
+    fpa = fp.replace(".csv", "_trend_analysis.csv")
+
+    # Ensure data is sorted by Symbol and Date
+    df.sort_values(by=["Symbol", "Date"], inplace=True)
+    df.reset_index(drop=True, inplace=True)
+
+    # Define columns to analyze
+    cols = ["RSI", "Support", "Resistance", "PCR"]
+
+    # Group by Symbol and compute difference
+    for col in cols:
+        df[col + "_change"] = df.groupby("Symbol")[col].diff()
+        # Convert diff to trend labels
+        df[col + "_trend"] = df[col + "_change"].apply(lambda x: "up" if x > 0 else ("down" if x < 0 else "unchanged"))
+
+    trend_summary = df.groupby("Symbol").agg({
+        "RSI_trend":        lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+        "Support_trend":    lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+        "Resistance_trend": lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+        "PCR_trend":        lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
+        
+    })
+
+    trend_summary.reset_index(inplace=True)
+    #print(trend_summary)
+    print(f"{printstr} Writing into the file {fp}")
+    trend_summary.to_csv(fpa, mode='w', header=True, index=False)
+    print(f"{printstr} Completed Writing\n")
+
+
+
 headers_list = ["Date", "expiryDate", "Symbol", "Type", "CMP", "Stock PE", "BV-to-CMP", "RSI", 
                      "MACD", "MACD_Signal", "MACD_To_Signal", "BB Analysis", "strikePrice", "Comments",
                      "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR"]
@@ -310,9 +344,11 @@ for symnum, symbol in enumerate(symbols, start=1):
     time.sleep(2)
 
 print(f"Writing into the file {fp}")
-
 whole_df = whole_df[headers_list]
-                       
 whole_df.to_csv(fp, mode=md, header=header, index=False)
 print("Completed writing")
+
+
+trendAnalysis(fp)
+
 print(datetime.now().strftime("%H:%M:%S"))

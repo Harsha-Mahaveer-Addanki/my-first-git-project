@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
     end_date = dt.date.today() + dt.timedelta(days=1)
     start_date = end_date - dt.timedelta(days=365)
-    date_clm = end_date.strftime("%d-%b-%Y")
+    date_clm = dt.date.today().strftime("%d-%b-%Y")
     all_results = []
     file_name = "Nifty200_MidCap100_SmallCap100.csv"
     printstr = "\n--------------->>>>"

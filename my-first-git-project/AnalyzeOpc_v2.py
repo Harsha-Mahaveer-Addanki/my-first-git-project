@@ -1,15 +1,8 @@
-from datetime import datetime,timedelta,date
 import datetime as dt
 
 import pandas as pd
 import math,time,os
 from nsepython import nse_optionchain_scrapper, fnolist, nsesymbolpurify
-from bs4 import BeautifulSoup
-from urllib.request import urlopen, Request
-from ta.momentum import RSIIndicator
-from ta.trend import MACD,EMAIndicator
-from ta.volatility import BollingerBands
-from datetime import date
 from tqdm import tqdm
 import gc
 pd.set_option('display.max_columns', None)
@@ -279,7 +272,7 @@ while True:
             header = False
             break
         elif int(ip) == 2:
-            fp = fp.replace(".csv", "_" + datetime.now().strftime("%d-%b-%Y-%H-%M-%S") + ".csv")
+            fp = fp.replace(".csv", "_" + dt.datetime.now().strftime("%d-%b-%Y-%H-%M-%S") + ".csv")
             break
         else:
             print_msg(type="Warn", msg=f"{printstr} Wrong Selection.\n")
@@ -291,7 +284,7 @@ os.system('')
 print(f"{printstr} Found total {len(symbols)} Symbols.\n")
 
 # Current time with hours:minutes:seconds
-print("\n\t\tTime Start: " + datetime.now().strftime("%H:%M:%S") + "\n")
+print("\n\t\tTime Start: " + dt.datetime.now().strftime("%H:%M:%S") + "\n")
 
 for symnum, symbol in enumerate(symbols, start=1):
     symbol=nsesymbolpurify(symbol)
@@ -301,4 +294,4 @@ for symnum, symbol in enumerate(symbols, start=1):
 
 Creat_fullReport_and_trendAnalysis(fp)
 
-print(datetime.now().strftime("%H:%M:%S"))
+print(dt.datetime.now().strftime("%H:%M:%S"))

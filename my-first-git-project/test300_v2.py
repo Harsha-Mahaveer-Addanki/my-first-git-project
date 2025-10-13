@@ -13,10 +13,11 @@ from tqdm import tqdm
 
 try:
     from Backup.allIndices import AllList
-except ImportError:
+except ImportError as e:
     from allIndices import AllList
 
 if os.name == 'nt':
+    print("This seems to be Windows. Using YFinance")
     import yfinance as yf
     def eq_func(sym):
         df = yf.download(sym + ".NS", start=start_date, end=end_date, auto_adjust=True, progress=False)
@@ -26,6 +27,7 @@ if os.name == 'nt':
         df['Close'] = df['Close'].round(2)
         return df[['Date', 'Close']]
 elif "pydroid" in sys.executable.lower():
+    print("This seems to be pydroid on Android. Using nsepython")
     from nsepython import equity_history
     def eq_func(sym):
         df = equity_history(symbol=sym, series="EQ",
@@ -34,8 +36,6 @@ elif "pydroid" in sys.executable.lower():
         df.rename(columns={"CH_TIMESTAMP": "Date", "CH_CLOSING_PRICE": "Close"}, inplace=True)
         df.sort_values(by='Date', inplace=True)
         return df[['Date', 'Close']]
-    print("This code is written on your home laptop. Check it and rewrite. Or else use the laternative")
-    exit(0)
 
 # --- Screener.in header ---
 screener_hdr = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}

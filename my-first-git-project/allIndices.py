@@ -5,6 +5,7 @@ smlcap100 = ['AADHARHFC', 'AARTIIND', 'ABREL', 'AEGISLOG', 'AEGISVOPAK', 'AFCONS
 
 AllList = sorted(list(set(nifty200) | set(midcap100)  | set(smlcap100)))
 
+"""
 import datetime as dt
 import yfinance as yf
 import pandas as pd
@@ -31,3 +32,4 @@ def pydroid_eq_func(sym):
     #return df[['Date', 'Close', 'CH_LAST_TRADED_PRICE']]
     #df['Date'] = pd.to_datetime(df['CH_TIMESTAMP']).dt.date
     #df.set_index('Date', inplace=True)    
+    """

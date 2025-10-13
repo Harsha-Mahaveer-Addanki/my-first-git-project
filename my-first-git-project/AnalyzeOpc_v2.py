@@ -6,7 +6,6 @@ import math,time,os
 from nsepython import nse_optionchain_scrapper, fnolist, nsesymbolpurify
 from bs4 import BeautifulSoup
 from urllib.request import urlopen, Request
-import yfinance as yf
 from ta.momentum import RSIIndicator
 from ta.trend import MACD,EMAIndicator
 from ta.volatility import BollingerBands
@@ -136,7 +135,7 @@ def collect_opc_data(symbol) :
                        df.dropna(inplace=True)
                        pbar.update(1)
 
-                       whole_df = pd.concat([whole_df, df], ignore_index=True)
+                       whole_df = pd.concat([whole_df, df], ignore_index=True).round(2)
                        del chain_data
                        del df
                        gc.collect()

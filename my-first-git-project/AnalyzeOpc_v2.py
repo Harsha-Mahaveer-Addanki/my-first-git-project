@@ -252,10 +252,6 @@ while True:
     else:
         print_msg(type="Warn", msg=f"{printstr} Wrong Selection.\n")
 
-end_date = dt.date.today()
-end_date = end_date + dt.timedelta(days=1)
-start_date = end_date - dt.timedelta(days=days)
-
 md = 'w'
 header = True
 while True:

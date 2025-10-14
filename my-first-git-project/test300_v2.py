@@ -17,7 +17,7 @@ except ImportError as e:
     from allIndices import AllList
 
 if os.name == 'nt':
-    print("This seems to be Windows. Using YFinance")
+    #print("This seems to be Windows. Using YFinance")
     import yfinance as yf
     def eq_func(sym):
         df = yf.download(sym + ".NS", start=start_date, end=end_date, auto_adjust=True, progress=False)
@@ -27,7 +27,7 @@ if os.name == 'nt':
         df['Close'] = df['Close'].round(2)
         return df[['Date', 'Close']]
 elif "pydroid" in sys.executable.lower():
-    print("This seems to be pydroid on Android. Using nsepython")
+    #print("This seems to be pydroid on Android. Using nsepython")
     from nsepython import equity_history
     def eq_func(sym):
         df = equity_history(symbol=sym, series="EQ",

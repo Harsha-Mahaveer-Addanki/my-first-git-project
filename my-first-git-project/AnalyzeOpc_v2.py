@@ -160,14 +160,18 @@ def Creat_fullReport_and_trendAnalysis(fp):
     df.reset_index(drop=True, inplace=True)
 
     # Define columns to analyze
-    cols = ["Support", "Resistance", "PCR"]
+    cols = ["CMP", "strikePrice", "Support", "Resistance", "PCR"]
 
     # Group by Symbol and compute difference
     for col in cols:
         df[col + "_change"] = df.groupby("Symbol")[col].diff(3)
+    
+        # Percentage difference over 3 rows
+        df[col + "_pct_change"] = df.groupby("Symbol")[col].apply(lambda x: x.diff(3) / x.shift(3) * 100)
+        
         # Convert diff to trend labels
         df[col + "_trend"] = df[col + "_change"].apply(lambda x: "up" if x > 0 else ("down" if x < 0 else "unchanged"))
-
+    """
     trend_summary = df.groupby("Symbol").agg({
         "Support_trend":    lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
         "Resistance_trend": lambda x: "up" if all(v=="up" for v in x[1:]) else ("down" if all(v=="down" for v in x[1:]) else "mixed"),
@@ -177,8 +181,9 @@ def Creat_fullReport_and_trendAnalysis(fp):
 
     trend_summary.reset_index(inplace=True)
     #print(trend_summary)
+    """
     print(f"{printstr} Writing into the file {fpa}")
-    trend_summary.to_csv(fpa, mode='w', header=True, index=False)
+    df.to_csv(fpa, mode='w', header=True, index=False)
     print(f"{printstr} Completed Writing\n")
 
     del whole_df
@@ -211,7 +216,13 @@ while True:
         break
     elif 3 == int(ip):
         print(f"{printstr} 300 Stocks (Nifty200, MidCap 100, SmallCap 100)")
-        from Backup.allIndices import AllList
+        try:
+            from Backup.allIndices import AllList
+        except ImportError as e:
+            from allIndices import AllList
+        except:
+             print_msg(type="fail", msg="Could not impoprt the AllList. Existing")
+             exit(0)
         file_name = "Nifty200_MidCap100_SmallCap100.csv"
         symbols = sorted(set(fnolist()) | set(AllList))
         symbols.remove('NIFTY')

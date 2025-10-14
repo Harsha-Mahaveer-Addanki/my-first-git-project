@@ -172,6 +172,18 @@ def analyze_symbol(symbol, slow=26, fast=12, sign=9):
     
     return indicators
 
+def is_file_locked(filepath):
+    """Check if a file is open/locked by another process (e.g., Excel)."""
+    if not os.path.exists(filepath):
+        return False  # File doesn't exist, so it's not locked
+
+    try:
+        # Try opening for append (no truncation)
+        with open(filepath, "a"):
+            return False  # If success, not locked
+    except PermissionError:
+        return True  # Locked by another process
+
 # --- Report and Trend Analysis ---
 def Creat_fullReport_and_trendAnalysis(fp):
     global all_results
@@ -182,6 +194,13 @@ def Creat_fullReport_and_trendAnalysis(fp):
                            'MACD_Hist', 'Market_Cap',  'Stock_PE', 'Book_Value']]
 
     fp = os.path.join(os.getcwd(), file_name)
+
+    while True:
+        if is_file_locked(fp):
+            input(f"\033[97;41mFile '{fp}' is open in another program! \nClose it before running the script & press enter\033[0m")
+        else:
+            print("✅ File is free to write.")
+            break
 
     #write_header = not os.path.isfile(fp)
 
@@ -231,7 +250,7 @@ if __name__ == "__main__":
     del all_results
     gc.collect()
     print(dt.datetime.now().strftime("%H:%M:%S"))
-    
+    exit(0)
     import subprocess
     subprocess.run(["git", "add", fp], check=True)
     subprocess.run(["git", "commit", "-m", "Auto commit from Home Laptop"], check=True)

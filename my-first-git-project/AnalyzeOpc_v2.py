@@ -167,7 +167,7 @@ def Creat_fullReport_and_trendAnalysis(fp):
         df[col + "_change"] = df.groupby("Symbol")[col].diff(3)
     
         # Percentage difference over 3 rows
-        df[col + "_pct_change"] = df.groupby("Symbol")[col].apply(lambda x: x.diff(3) / x.shift(3) * 100)
+        df[col + "_pct_change"] = df.groupby("Symbol")[col].transform(lambda x: x.diff(3) / x.shift(3) * 100)
         
         # Convert diff to trend labels
         df[col + "_trend"] = df[col + "_change"].apply(lambda x: "up" if x > 0 else ("down" if x < 0 else "unchanged"))

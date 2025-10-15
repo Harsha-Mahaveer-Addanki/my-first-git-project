@@ -35,7 +35,7 @@ def print_msg(type="SUCCESS", msg=""):
           print(f"\033[93;44m{msg}\033[0m")
           
 def collect_opc_data(symbol) :
-     max_retries = 1
+     max_retries = 2
      attempt = 0
      while attempt < max_retries:
            try:
@@ -140,6 +140,7 @@ def collect_opc_data(symbol) :
                  if attempt < max_retries:
                        #print(f"\033[93;44m{attempt} Failed with symbol {symbol} {e}. Retrying\033[0m")
                        print_msg(type="warn", msg=f"{attempt} Failed with symbol {symbol} {e}. Retrying")
+                       time.sleep(5 * (2 ** attempt))
                  else:
                        #print(f"\033[97;41mMax tries of {max_retries} reached. Seeing Error: {e}. Exiting\033[0m")
                        print_msg(type="fail", msg=f"Max tries of {max_retries} reached. Seeing Error: {e}. Exiting")

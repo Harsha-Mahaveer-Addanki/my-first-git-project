@@ -4,7 +4,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 
-# --- Initialize app ---
+# --- Initialize Dash ---
 app = dash.Dash(__name__)
 server = app.server
 
@@ -14,29 +14,49 @@ df["Date"] = pd.to_datetime(df["Date"])
 
 # --- App layout ---
 app.layout = html.Div([
+    # Top row: Holding checkbox + Stock selection dropdown + Stats
     html.Div(
-        style={"display": "flex", "alignItems": "center", "justifyContent": "space-between"},
+        style={"display": "flex", "alignItems": "center", "justifyContent": "flex-start", "gap": "20px", "padding": "10px"},
         children=[
-            # Stock selection dropdown
+            # Checkbox for Holding filter
+            dcc.Checklist(
+                id="holding-filter",
+                options=[{"label": "Hlds Only", "value": "holding"}],
+                value=[],
+                inputStyle={"margin-right": "5px"}
+            ),
+            # Stock dropdown
             dcc.Dropdown(
                 id="symbol-dropdown",
-                options=[{"label": s, "value": s} for s in df["Symbol"].unique()],
-                value=df["Symbol"].unique()[0],
+                options=[{"label": s, "value": s} for s in sorted(df["Symbol"].unique())],
+                value=sorted(df["Symbol"].unique())[0],
                 clearable=False,
-                style={"width": "300px"}
+                style={"width": "300px", "backgroundColor": "#ffffff"}
             ),
-            # Stats / summary next to dropdown
+            # Stats / summary
             html.Div(
                 id="stats-output",
                 style={"fontWeight": "bold", "marginLeft": "20px"}
             )
         ]
     ),
-    # Graph below
+    # Graph
     dcc.Graph(id="trend-graph", style={"height": "90vh"})
 ])
 
+# --- Callback to update stock dropdown if holding filter is applied ---
+@app.callback(
+    Output("symbol-dropdown", "options"),
+    Input("holding-filter", "value")
+)
+def update_dropdown(holding_values):
+    if "holding" in holding_values:
+        symbols = sorted(df[df["Type"] == "Holding"]["Symbol"].unique())
+    else:
+        symbols = sorted(df["Symbol"].unique())
+    return [{"label": s, "value": s} for s in symbols]
 
+# --- Callback to update graph and stats ---
 @app.callback(
     [Output("trend-graph", "figure"),
      Output("stats-output", "children")],
@@ -45,64 +65,98 @@ app.layout = html.Div([
 def update_graph(symbol):
     data = df[df["Symbol"] == symbol].sort_values("Date").reset_index(drop=True)
     
-    # Sequential x-axis positions
+    if data.empty:
+        fig = go.Figure()
+        fig.update_layout(
+            title="No data available for this selection",
+            xaxis_title="Date",
+            yaxis_title="Values",
+            plot_bgcolor="#f5f5f5",
+            paper_bgcolor="#f5f5f5"
+        )
+        return fig, "No data to display"
+
+    # Map dates to sequential positions
     x_pos = list(range(len(data)))
     tickvals = x_pos
     ticktext = [d.strftime("%d") if d.day != 1 else d.strftime("%d-%b") for d in data["Date"]]
 
+    # Prepare customdata: one per date, all indicators
+    customdata = list(zip(
+        data["Date"], data["CMP"], data["Support"], data["Resistance"], data["strikePrice"], data["PCR"]
+    ))
+
+    # --- Plot traces ---
     fig = go.Figure()
+    traces = [
+        ("CMP", data["CMP"], "blue", "y", "solid"),
+        ("Support", data["Support"], "green", "y", "dot"),
+        ("Resistance", data["Resistance"], "red", "y", "dot"),
+        ("Strike Price", data["strikePrice"], "olive", "y", "solid"),
+        ("PCR", data["PCR"], "orange", "y2", "solid")
+    ]
 
-    # Lines
-    fig.add_trace(go.Scatter(x=x_pos, y=data["CMP"], name="CMP", line=dict(color="blue")))
-    fig.add_trace(go.Scatter(x=x_pos, y=data["Support"], name="Support", line=dict(color="green", dash="dot")))
-    fig.add_trace(go.Scatter(x=x_pos, y=data["Resistance"], name="Resistance", line=dict(color="red", dash="dot")))
-    fig.add_trace(go.Scatter(x=x_pos, y=data["strikePrice"], name="Strike Price", line=dict(color="olive")))
-    fig.add_trace(go.Scatter(x=x_pos, y=data["PCR"], name="PCR", line=dict(color="orange"), yaxis="y2"))
+    for name, y, color, yaxis, dash_style in traces:
+        fig.add_trace(go.Scatter(
+            x=x_pos,
+            y=y,
+            name=name,
+            line=dict(color=color, dash=dash_style),
+            yaxis=yaxis,
+            customdata=customdata,
+#            hovertemplate=(
+#                "%{name}<br>"
+#            )
+            hoverinfo="x+y+name"
+        ))
 
-    # Hide default legend
-    fig.update_layout(showlegend=False, yaxis2=dict(title="PCR", overlaying="y", side="right"),
-                      margin=dict(l=40, r=40, t=60, b=40))
-
-    # Inline labels beside last point of each line
-    colors = ["blue", "green", "red", "olive", "orange"]
-    names = ["CMP", "Support", "Resistance", "Strike Price", "PCR"]
-    ys = [data["CMP"].iloc[-1], data["Support"].iloc[-1], data["Resistance"].iloc[-1],
-          data["strikePrice"].iloc[-1], data["PCR"].iloc[-1]]
-
+    # --- Annotations for line labels ---
     annotations = []
-    for i, y_val in enumerate(ys):
+    for name, y, color, yaxis, _ in traces:
         annotations.append(dict(
-            x=x_pos[-1] + 0.3,  # slightly right of last point
-            y=y_val,
+            x=x_pos[-1] + 0.3,
+            y=y.iloc[-1],
             xref="x",
-            yref="y" if names[i] != "PCR" else "y2",
-            text=names[i],
-            font=dict(
-                color=colors[i],
-                size=12,
-                family="Arial Black, Arial, sans-serif",  # bold-looking font
-                weight="bold"  # correct property
-            ),
+            yref="y" if name != "PCR" else "y2",
+            text=name,
+            font=dict(color="White", size=12, family="Arial Black, Arial, sans-serif"),
             showarrow=False,
-            align="left",
-            bgcolor="rgba(255,255,255,0.8)",  # semi-transparent background
-            bordercolor=colors[i],
+            align="right",
+            bgcolor="rgba(0,0,0,0.8)",
+            bordercolor=color,
             borderwidth=1,
             borderpad=2
         ))
 
+    # --- Layout ---
+    fig.update_layout(
+        plot_bgcolor="#f5f5f5",
+        paper_bgcolor="#f5f5f5",
+        font=dict(color="#333"),
+        yaxis=dict(title="CMP / Support / Resistance / Strike Price"),
+        yaxis2=dict(title="PCR", overlaying="y", side="right"),
+        legend=dict(orientation="v", yanchor="top", y=0.95, xanchor="left", x=1.02),
+        margin=dict(l=40, r=120, t=60, b=40),
+        annotations=annotations,
+        hovermode="x unified"
+    )
 
-    fig.update_layout(annotations=annotations)
+    # --- X-axis settings ---
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=ticktext,
+        tickangle=45
+    )
 
-    # X-axis settings
-    fig.update_xaxes(tickmode="array", tickvals=tickvals, ticktext=ticktext, tickangle=45)
-
-    # Summary text
+    # --- Latest summary ---
     latest = data.iloc[-1]
-    summary = f"As of {latest['Date'].date()} | CMP: {latest['CMP']} | Sup: {latest['Support']} | Res: {latest['Resistance']} | PCR: {latest['PCR']} | Strk Price: {latest['strikePrice']}"
+    summary = (
+        f"Exp: {latest['expiryDate']} | As of {latest['Date'].date()} | CMP: {latest['CMP']} | Sup: {latest['Support']} | "
+        f"Res: {latest['Resistance']} | PCR: {latest['PCR']} | Strk Price: {latest['strikePrice']}"
+    )
 
     return fig, summary
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8050, debug=False)

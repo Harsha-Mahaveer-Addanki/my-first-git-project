@@ -109,12 +109,64 @@ def calc_bb_mid(df):
 def calc_bb_lo(df):
     return BollingerBands(df["Close"], window=20, window_dev=2).bollinger_lband().iloc[-1]
 
+"""
 Trend_Dict = {
     "Below BBLo":  {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
-    "Lower BBand": {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"}, 
+    "Close to BBLo": {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
+    "Close but BELOW Mid": {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
     "Mid":         {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
-    "Upper BBand": {"decreasing" : "Pullback in uptrend",        "increasing" : "Upside / Bullish"},
+    "Close but ABOVE Mid": {"decreasing" : "Pullback in uptrend",        "increasing" : "Upside / Bullish"},
+    "Close to BBHi": {"decreasing" : "Pullback in uptrend",        "increasing" : "Upside / Bullish"},
     "Above BBHi":  {"decreasing" : "Pullback in uptrend",        "increasing" : "Strong upside / Strong bullish"},}
+"""
+
+Trend_Dict = {
+    "Below BBLo": {
+        "decreasing": "Broke BBLo (strong dwnside momentum/oversold)",
+        "increasing": "Possible rebound from oversold zone",
+    },
+    "Close to BBLo": {
+        "decreasing": "Approaching BBLo. Weakness persisting near support",
+        "increasing": "weak, possibly rebounding (early reversal possible)",
+    },
+    "Close but BELOW Mid": {
+        "decreasing": "Below SMA - Bearish to neutral — still under pressure",
+        "increasing": "Gradual recovery toward mean",
+    },
+    "Mid": {
+        "decreasing": "Losing momentum / neutralizing after prior uptrend",
+        "increasing": "Stabilizing / preparing for uptrend continuation",
+    },
+    "Close but ABOVE Mid": {
+        "decreasing": "Pullback in ongoing uptrend",
+        "increasing": "Above SMA, Mild bullishness, possible continuation",
+    },
+    "Close to BBHi": {
+        "decreasing": "Pullback near resistance or profit booking",
+        "increasing": "Aproaching BBHi/nearing overbought zone",
+    },
+    "Above BBHi": {
+        "decreasing": "Reversal from overbought zone or exhaustion",
+        "increasing": "Broke BBHi (Strong upside momentum/breakout/overbought",
+    },
+}
+
+def bb_position(pos_val):
+    if pos_val <= 0:
+        return "Below BBLo"
+    elif pos_val <= 0.25:
+        return "Close to BBLo"
+    elif pos_val < 0.5:
+        return "Close but BELOW Mid"
+    elif pos_val == 0.5:
+        return "Mid"
+    elif pos_val <= 0.75:
+        return "Close but ABOVE Mid"
+    elif pos_val < 1.0:
+        return "Close to BBHi"
+    else:
+        return "Above BBHi"
+
 
 # --- Main function per symbol ---
 def analyze_symbol(symbol, slow=26, fast=12, sign=9):
@@ -161,7 +213,7 @@ def analyze_symbol(symbol, slow=26, fast=12, sign=9):
 
     indicators["Symbol"] = symbol
     pos_val = round(((df['Close'].iloc[-1] - indicators['BB_LO']) / (indicators['BB_HI'] - indicators['BB_LO'])), 2)
-    indicators['BB Pos'] = "Below BBLo" if pos_val <= 0 else "Lower BBand" if (pos_val > 0) and (pos_val < 0.5) else "Mid" if round(pos_val, 1) == 0.5 else "Upper BBand" if (round(pos_val, 1) > 0.5) and (pos_val <= 1) else "Above BBHi"
+    indicators['BB Pos'] = bb_position(pos_val=pos_val) #"Below BBLo" if pos_val <= 0 else "Close to BBLo" if (pos_val > 0) and (pos_val <= 0.25) else "Close but BELOW Mid" if (pos_val > 0.25) and (pos_val < 0.5) else "Mid" if round(pos_val, 1) == 0.5 else "Close but ABOVE Mid" if (round(pos_val, 1) > 0.5) and (pos_val <= 0.75) else "Close to BBHi" if (round(pos_val, 1) > 0.5) and (pos_val <= 0.75) else "Above BBHi"
     indicators['Interpretation'] = Trend_Dict[indicators['BB Pos']][indicators['CMP Dir']]
     indicators['Holding'] = "Yes" if symbol in HLDNGS else "No"
     indicators['FnO'] = "Yes" if symbol in fno else "No"

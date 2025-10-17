@@ -109,6 +109,12 @@ def calc_bb_mid(df):
 def calc_bb_lo(df):
     return BollingerBands(df["Close"], window=20, window_dev=2).bollinger_lband().iloc[-1]
 
+def calc_52w_hi_low(df):
+    return df['Close'].tail(252).max(), df['Close'].tail(252).min()
+
+def calc_26w_hi_low(df):
+    return df['Close'].tail(126).max(), df['Close'].tail(126).min()
+
 """
 Trend_Dict = {
     "Below BBLo":  {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
@@ -193,6 +199,8 @@ def analyze_symbol(symbol, slow=26, fast=12, sign=9):
         (calc_bb_hi, df),
         (calc_bb_mid, df),
         (calc_bb_lo, df),
+        (calc_52w_hi_low, df),
+        (calc_26w_hi_low, df),
     ]
 
     results = []
@@ -210,6 +218,8 @@ def analyze_symbol(symbol, slow=26, fast=12, sign=9):
     indicators["BB_HI"] = results[3]
     indicators["BB_MID"] = results[4]
     indicators["BB_LO"] = results[5]
+    indicators["52W_hi"], indicators["52W_lo"] = results[6]
+    indicators["26W_hi"], indicators["26W_lo"] = results[7]
 
     indicators["Symbol"] = symbol
     pos_val = round(((df['Close'].iloc[-1] - indicators['BB_LO']) / (indicators['BB_HI'] - indicators['BB_LO'])), 2)
@@ -242,7 +252,8 @@ def Creat_fullReport_and_trendAnalysis(fp):
 
     df_final = pd.DataFrame(all_results)
     df_final['Date'] = date_clm
-    df_final = df_final[['Date', 'FnO', 'Holding', 'Symbol', 'CMP', 'RSI_Trend', 'BB Pos', 'CMP Dir', 'Interpretation', 'MACD_Trend', 'RSI', 'BB_HI', 'BB_MID', 'BB_LO', 'MACD', 'MACD_Signal',
+    df_final.rename(columns={"CMP": "CMP-"+ date_clm}, inplace=True)
+    df_final = df_final[['FnO', 'Holding', 'Symbol', "CMP-"+ date_clm, 'RSI_Trend', 'BB Pos', 'CMP Dir', 'Interpretation', '52W_hi', '52W_lo', '26W_hi', '26W_lo', 'MACD_Trend', 'RSI', 'BB_HI', 'BB_MID', 'BB_LO', 'MACD', 'MACD_Signal',
                            'MACD_Hist', 'Market_Cap',  'Stock_PE', 'Book_Value']]
 
     fp = os.path.join(os.getcwd(), file_name)
@@ -257,7 +268,7 @@ def Creat_fullReport_and_trendAnalysis(fp):
     #write_header = not os.path.isfile(fp)
 
     print(f"{printstr} Writing into the file {fp}")
-    df_final.to_csv(fp, mode='w', header=True, index=True)
+    df_final.to_csv(fp, mode='w', header=True, index=False)
     print(f"{printstr} Completed Writing\n")
 
     del df_final
@@ -274,11 +285,11 @@ if __name__ == "__main__":
     symbols.remove('BANKNIFTY')
     if (len(sys.argv) > 1) and sys.argv[1].lower() == "test":
         import random
-        symbols = random.sample(symbols, 5)
+        symbols = random.sample(symbols, 2)
 
     end_date = dt.date.today() + dt.timedelta(days=1)
     start_date = end_date - dt.timedelta(days=365)
-    date_clm = dt.date.today().strftime("%d-%b-%Y")
+    date_clm = dt.date.today().strftime("%d/%m/%Y")
     all_results = []
     file_name = "Nifty200_MidCap100_SmallCap100.csv"
     printstr = "\n--------------->>>>"

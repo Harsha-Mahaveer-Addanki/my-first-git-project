@@ -135,7 +135,8 @@ def update_graph(symbol):
         font=dict(color="#333"),
         yaxis=dict(title="CMP / Support / Resistance / Strike Price"),
         yaxis2=dict(title="PCR", overlaying="y", side="right"),
-        legend=dict(orientation="v", yanchor="top", y=0.95, xanchor="left", x=1.02),
+        #legend=dict(orientation="v", yanchor="top", y=0.95, xanchor="left", x=1.02),
+        showlegend=False,
         margin=dict(l=40, r=120, t=60, b=40),
         annotations=annotations,
         hovermode="x unified"

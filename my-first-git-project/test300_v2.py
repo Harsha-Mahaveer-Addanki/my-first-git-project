@@ -11,10 +11,7 @@ from nsepython import fnolist
 from urllib.error import HTTPError, URLError
 from tqdm import tqdm
 
-try:
-    from Backup.allIndices import AllList
-except ImportError as e:
-    from allIndices import AllList
+from allIndices import AllList, STOCK_INFO
 
 if os.name == 'nt':
     #print("This seems to be Windows. Using YFinance")
@@ -115,17 +112,6 @@ def calc_52w_hi_low(df):
 def calc_26w_hi_low(df):
     return df['Close'].tail(126).max(), df['Close'].tail(126).min()
 
-"""
-Trend_Dict = {
-    "Below BBLo":  {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
-    "Close to BBLo": {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
-    "Close but BELOW Mid": {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
-    "Mid":         {"decreasing" : "Strong downside / weakness", "increasing" : "Recovering from lower range"},
-    "Close but ABOVE Mid": {"decreasing" : "Pullback in uptrend",        "increasing" : "Upside / Bullish"},
-    "Close to BBHi": {"decreasing" : "Pullback in uptrend",        "increasing" : "Upside / Bullish"},
-    "Above BBHi":  {"decreasing" : "Pullback in uptrend",        "increasing" : "Strong upside / Strong bullish"},}
-"""
-
 Trend_Dict = {
     "Below BBLo": {
         "decreasing": "Broke BBLo (strong dwnside momentum/oversold)",
@@ -173,7 +159,7 @@ def bb_position(pos_val):
     else:
         return "Above BBHi"
 
-
+allKeyList = ['macro', 'sector', 'industry', 'basicIndustry', 'listingDate']
 # --- Main function per symbol ---
 def analyze_symbol(symbol, slow=26, fast=12, sign=9):
     gc.collect()
@@ -227,6 +213,9 @@ def analyze_symbol(symbol, slow=26, fast=12, sign=9):
     indicators['Interpretation'] = Trend_Dict[indicators['BB Pos']][indicators['CMP Dir']]
     indicators['Holding'] = "Yes" if symbol in HLDNGS else "No"
     indicators['FnO'] = "Yes" if symbol in fno else "No"
+    for k in allKeyList:
+        indicators[k] = STOCK_INFO[symbol][k]
+    
     pbar.update(1)
     
     cmp_thread.join()
@@ -254,7 +243,7 @@ def Creat_fullReport_and_trendAnalysis(fp):
     df_final['Date'] = date_clm
     df_final.rename(columns={"CMP": "CMP-"+ date_clm}, inplace=True)
     df_final = df_final[['FnO', 'Holding', 'Symbol', "CMP-"+ date_clm, 'RSI_Trend', 'BB Pos', 'CMP Dir', 'Interpretation', '52W_hi', '52W_lo', '26W_hi', '26W_lo', 'MACD_Trend', 'RSI', 'BB_HI', 'BB_MID', 'BB_LO', 'MACD', 'MACD_Signal',
-                           'MACD_Hist', 'Market_Cap',  'Stock_PE', 'Book_Value']]
+                           'MACD_Hist', 'Market_Cap',  'Stock_PE', 'Book_Value', 'macro', 'sector', 'industry', 'basicIndustry', 'listingDate']]
 
     fp = os.path.join(os.getcwd(), file_name)
 

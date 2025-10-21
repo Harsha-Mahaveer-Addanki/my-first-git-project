@@ -3,8 +3,7 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
-import logging
-import sys
+from allIndices import STOCK_INFO   # import your dict
 
 # --- Initialize Dash ---
 app = dash.Dash(
@@ -18,6 +17,11 @@ server = app.server
 # --- Load CSV ---
 df = pd.read_csv("AllFnOStocks_Opc_trend_analysis.csv")
 df["Date"] = pd.to_datetime(df["Date"])
+
+# --- Merge STOCK_INFO ---
+info_df = pd.DataFrame.from_dict(STOCK_INFO, orient="index").reset_index()
+info_df.rename(columns={"index": "Symbol"}, inplace=True)
+df = df.merge(info_df, on="Symbol", how="left")
 
 # --- App Layout ---
 app.layout = html.Div(
@@ -46,6 +50,21 @@ app.layout = html.Div(
                     value=[],
                     inputStyle={"margin-right": "5px"}
                 ),
+                # Group-by dropdown
+                dcc.Dropdown(
+                    id="groupby-dropdown",
+                    options=[
+                        {"label": "Symbol", "value": "Symbol"},
+                        {"label": "Sector", "value": "sector"},
+                        {"label": "Industry", "value": "industry"},
+                        {"label": "Basic Industry", "value": "basicIndustry"},
+                        {"label": "Macro", "value": "macro"},
+                    ],
+                    value="Symbol",
+                    clearable=False,
+                    style={"width": "180px"}
+                ),
+                # Symbol or group dropdown
                 dcc.Dropdown(
                     id="symbol-dropdown",
                     options=[{"label": s, "value": s} for s in sorted(df["Symbol"].unique())],
@@ -78,27 +97,48 @@ app.layout = html.Div(
     ]
 )
 
-# --- Update dropdown options ---
+# --- Update dropdown options based on groupby ---
 @app.callback(
     Output("symbol-dropdown", "options"),
-    Input("holding-filter", "value")
+    [Input("holding-filter", "value"),
+     Input("groupby-dropdown", "value")]
 )
-def update_dropdown(holding_values):
+def update_dropdown(holding_values, groupby):
+    data = df.copy()
     if "holding" in holding_values:
-        symbols = sorted(df[df["Type"] == "Holding"]["Symbol"].unique())
-    else:
-        symbols = sorted(df["Symbol"].unique())
-    return [{"label": s, "value": s} for s in symbols]
-
+        data = data[data["Type"] == "Holding"]
+    values = sorted(data[groupby].dropna().unique())
+    return [{"label": s, "value": s} for s in values]
 
 # --- Update graph and stats ---
 @app.callback(
     [Output("trend-graph", "figure"),
      Output("stats-output", "children")],
-    [Input("symbol-dropdown", "value")]
+    [Input("symbol-dropdown", "value"),
+     Input("groupby-dropdown", "value")]
 )
-def update_graph(symbol):
-    data = df[df["Symbol"] == symbol].sort_values("Date").reset_index(drop=True)
+def update_graph(selected_value, groupby):
+    if selected_value is None:
+        fig = go.Figure()
+        fig.update_layout(title="No selection")
+        return fig, "No data to display"
+
+    if groupby == "Symbol":
+        data = df[df["Symbol"] == selected_value].sort_values("Date").reset_index(drop=True)
+    else:
+        # Aggregate all stocks in this group by Date
+        group_data = (
+            df[df[groupby] == selected_value]
+            .groupby("Date", as_index=False)
+            .agg({
+                "CMP": "mean",
+                "Support": "mean",
+                "Resistance": "mean",
+                "strikePrice": "mean",
+                "PCR": "mean"
+            })
+        )
+        data = group_data.sort_values("Date").reset_index(drop=True)
 
     if data.empty:
         fig = go.Figure()
@@ -109,11 +149,9 @@ def update_graph(symbol):
         )
         return fig, "No data to display"
 
-    # Sequential x positions
     x_pos = list(range(len(data)))
     ticktext = [d.strftime("%d") if d.day != 1 else d.strftime("%d-%b") for d in data["Date"]]
 
-    # Plot lines
     traces = [
         ("CMP", data["CMP"], "blue", "y", "solid"),
         ("Support", data["Support"], "green", "y", "dot"),
@@ -123,17 +161,62 @@ def update_graph(symbol):
     ]
 
     fig = go.Figure()
-    for name, y, color, yaxis, dash_style in traces:
-        fig.add_trace(go.Scatter(
-            x=x_pos,
-            y=y,
-            name=name,
-            line=dict(color=color, dash=dash_style),
-            yaxis=yaxis,
-            hoverinfo="x+y+name"
-        ))
 
-    # Label annotations
+    # --- CMP, Support, Resistance, etc. ---
+    # 1️⃣ Plot Support line first (lower boundary)
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["Support"],
+        name="Support",
+        line=dict(color="green", dash="dot"),
+        yaxis="y",
+        hoverinfo="x+y+name",
+        fill=None  # lower line only
+    ))
+
+    # 2️⃣ Plot Resistance line with fill between it and Support
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["Resistance"],
+        name="Resistance",
+        line=dict(color="red", dash="dot"),
+        yaxis="y",
+        hoverinfo="x+y+name",
+        fill='tonexty',  # fill between this and previous trace
+        fillcolor="rgba(0, 200, 0, 0.1)"  # translucent red shade
+    ))
+
+    # 3️⃣ Add CMP line
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["CMP"],
+        name="CMP",
+        line=dict(color="blue", dash="solid"),
+        yaxis="y",
+        hoverinfo="x+y+name"
+    ))
+
+    # 4️⃣ Add Strike Price
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["strikePrice"],
+        name="Strike Price",
+        line=dict(color="olive", dash="solid"),
+        yaxis="y",
+        hoverinfo="x+y+name"
+    ))
+
+    # 5️⃣ Add PCR line (secondary axis)
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["PCR"],
+        name="PCR",
+        line=dict(color="orange", dash="solid"),
+        yaxis="y2",
+        hoverinfo="x+y+name"
+    ))
+
+
     annotations = [
         dict(
             x=x_pos[-1] + 0.3,
@@ -173,7 +256,7 @@ def update_graph(symbol):
     )
 
     latest = data.iloc[-1]
-    summary = ()
+    summary = f"Showing {groupby} level trend: {selected_value}"
 
     return fig, summary
 

@@ -242,8 +242,8 @@ def Creat_fullReport_and_trendAnalysis(fp):
     df_final = pd.DataFrame(all_results)
     df_final['Date'] = date_clm
     df_final.rename(columns={"CMP": "CMP-"+ date_clm}, inplace=True)
-    df_final = df_final[['FnO', 'Holding', 'Symbol', "CMP-"+ date_clm, 'RSI_Trend', 'BB Pos', 'CMP Dir', 'Interpretation', '52W_hi', '52W_lo', '26W_hi', '26W_lo', 'MACD_Trend', 'RSI', 'BB_HI', 'BB_MID', 'BB_LO', 'MACD', 'MACD_Signal',
-                           'MACD_Hist', 'Market_Cap',  'Stock_PE', 'Book_Value', 'macro', 'sector', 'industry', 'basicIndustry', 'listingDate']]
+    df_final = df_final[["FnO", "Holding", "Symbol", "CMP-"+ date_clm, "CMP Dir", "BB Pos", "Interpretation", 
+                         "RSI_Trend", "MACD_Trend", "52W_hi", "52W_lo", "26W_hi", "26W_lo", "RSI", "BB_HI", "BB_MID", "BB_LO", "MACD", "MACD_Signal", "MACD_Hist", "Market_Cap", "Stock_PE", "Book_Value", "macro", "sector", "industry", "basicIndustry", "listingDate"]]
 
     fp = os.path.join(os.getcwd(), file_name)
 

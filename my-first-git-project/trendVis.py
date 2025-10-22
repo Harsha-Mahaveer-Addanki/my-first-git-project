@@ -256,7 +256,15 @@ def update_graph(selected_value, groupby):
     )
 
     latest = data.iloc[-1]
-    summary = f"Showing {groupby} level trend: {selected_value}"
+    #summary = f"Showing {groupby} level trend: {selected_value}"
+    if groupby == "Symbol":
+        num_symbols = 1
+        summary = ""
+    else:
+        # Count unique symbols in this group
+        num_symbols = df[df[groupby] == selected_value]["Symbol"].nunique()
+        summary = f"Showing avg data for {num_symbols} symbols" # in {groupby}: {selected_value}"
+
 
     return fig, summary
 

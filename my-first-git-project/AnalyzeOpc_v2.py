@@ -33,7 +33,7 @@ def print_msg(type="SUCCESS", msg=""):
           print(f"\033[97;41m{msg}\033[0m")
      elif type.lower() == "warn":
           print(f"\033[93;44m{msg}\033[0m")
-          
+
 def collect_opc_data(symbol) :
      max_retries = 2
      attempt = 0
@@ -42,94 +42,30 @@ def collect_opc_data(symbol) :
                  with tqdm(total=4, desc="Pipeline Progress", unit="step", leave=False) as pbar:
                        global whole_df
                        
-                       """
-                       data = nse_eq(symbol)
-                       pbar.update(1)
-                       macro = data['industryInfo']['macro']
-                       sector = data['industryInfo']['sector']
-                       industry = data['industryInfo']['industry']
-                       basicIndustry = data['industryInfo']['basicIndustry']
-                       """
-
-                       """
-                       RSI = MACD = MACD_Signal = BBHi = BBLi = ema_20 = 0
-                       stock_pe_ratio, stock_bv = 0,0
-                       bb_analysis = "NA"
-                       """
                        opcdata = nse_optionchain_scrapper(symbol)
                        pbar.update(1)
-                       
-                       records = opcdata['records']['data']
-                       ltp = opcdata['records']['underlyingValue']
-                       
-                       chain_data = []
-                       for item in records:
-                                    expiry = item["expiryDate"]
-                                    if expiry != opcdata['records']['expiryDates'][0]:
-                                         continue
-                                    strike = item.get("strikePrice")
-                                    
 
-                                    ce = item.get("CE", {})
-                                    pe = item.get("PE", {})
+                       df = pd.json_normalize(opcdata['filtered']['data'])[['PE.openInterest', 'CE.openInterest', 'strikePrice', 'PE.lastPrice', 'CE.lastPrice']]
+                       df.dropna(subset=["PE.openInterest", "CE.openInterest"], inplace=True)
+                       df.loc[:, "TotalOI"] = df.loc[:, "PE.openInterest"] + df.loc[:, "CE.openInterest"]
+                       max_row = df.loc[df['TotalOI'].idxmax()].copy().to_dict()
+                       max_row["Date"] = formatted_date
+                       max_row["expiryDate"] = opcdata['records']['expiryDates'][0]
+                       max_row["Symbol"] = symbol
+                       max_row["Type"] = "Holding" if symbol in HLDNGS else "Non-Hld"
+                       max_row["CMP"] = opcdata['records']['underlyingValue']
+                       max_row["Support"] = max_row['strikePrice'] - max_row["PE.lastPrice"] - max_row["CE.lastPrice"]
+                       max_row["Dist_from_Support"] = round(((max_row["CMP"] - max_row["Support"])/max_row["Support"])*100, 2)
+                       max_row["Resistance"] = max_row['strikePrice'] + max_row["PE.lastPrice"] + max_row["CE.lastPrice"]
+                       max_row["Dist_from_Resist"] = round(((max_row["Resistance"] - max_row["CMP"])/max_row["CMP"])*100, 2)
+                       max_row["PCR"] = opcdata['filtered']['PE']['totOI']/opcdata['filtered']['CE']['totOI']
 
-                                    ce_oi = 0 if ce.get("openInterest") == None else ce.get("openInterest")
-                                    pe_oi = 0 if pe.get("openInterest") == None else pe.get("openInterest")
-                                    CE_PE_Total = ce_oi + pe_oi
-
-                                    clas = 0 if ce.get("lastPrice") == None else ce.get("lastPrice")
-                                    plas = 0 if pe.get("lastPrice") == None else pe.get("lastPrice")
-                                    Support = strike - (clas + plas)
-                                    Resistance = strike + (clas + plas)
-                                    Dist_from_Support = ((ltp - Support)/Support) * 100
-                                    Dist_from_Resist = ((Resistance - ltp)/ltp) * 100
-                                    #comments = "NA"	        
-
-                                    chain_data.append({
-                                         "Date" : formatted_date,
-                                         "expiryDate": expiry,
-                                         "Symbol" : symbol,
-                                         "Type" : "Holding" if symbol in HLDNGS else "Non-Hld",
-                                         "CMP" : ltp,
-                                         #"Stock PE" : stock_pe_ratio ,
-                                         #"BV-to-CMP" : 0 if stock_bv == 0 else ltp/stock_bv,
-                                         #"RSI" : RSI,
-                                         #"MACD" : MACD,
-                                         #"MACD_Signal" : MACD_Signal,
-                                         #"MACD_To_Signal" : MACD - MACD_Signal,
-                                         "strikePrice": strike,
-                                         "CE_lastPrice": clas,
-                                         "PE_lastPrice": plas,                                         
-                                         #"Comments" : comments,
-                                         "CE_openInterest": ce_oi,
-                                         "PE_openInterest": pe_oi,
-                                         "CE_PE_Total": CE_PE_Total,
-                                         "Support" : Support,
-                                         "Dist_from_Support" : math.ceil(Dist_from_Support * 100)/100,
-                                         "Resistance" : Resistance,
-                                         "Dist_from_Resist" : math.ceil(Dist_from_Resist * 100)/100,
-                                         #"Macro": macro,
-                                         #"Sector": sector,
-                                         #"Industry": industry,
-                                         #"Basic Industry": basicIndustry,
-                                         #"BBHi" : BBHi,
-                                         #"BBLi" : BBLi,
-                                         #"BB Analysis" : bb_analysis, 
-                                    })
-
-                       df = pd.DataFrame(chain_data)
-                       pbar.update(1)
-                       Total_Puts = df.PE_openInterest.sum()
-                       Total_Calls = df.CE_openInterest.sum()
-
-                       df.drop(df[(df[["CE_lastPrice", "PE_lastPrice", "PE_openInterest", "CE_openInterest"]] == 0).any(axis=1)].index, inplace=True)
-                       df.loc[df["CE_PE_Total"].idxmax(), "PCR"] = 0 if Total_Calls == 0 else Total_Puts/Total_Calls
-
-                       df.dropna(inplace=True)
+                       df = pd.DataFrame(max_row, index=[0])
                        pbar.update(1)
 
                        whole_df = pd.concat([whole_df, df], ignore_index=True).round(2)
-                       del chain_data
+                       pbar.update(1)
+                       del max_row
                        del df
                        gc.collect()
                        pbar.update(1)
@@ -138,11 +74,9 @@ def collect_opc_data(symbol) :
            except Exception as e:
                  attempt += 1
                  if attempt < max_retries:
-                       #print(f"\033[93;44m{attempt} Failed with symbol {symbol} {e}. Retrying\033[0m")
                        print_msg(type="warn", msg=f"{attempt} Failed with symbol {symbol} {e}. Retrying")
                        time.sleep(5 * (2 ** attempt))
                  else:
-                       #print(f"\033[97;41mMax tries of {max_retries} reached. Seeing Error: {e}. Exiting\033[0m")
                        print_msg(type="fail", msg=f"Max tries of {max_retries} reached. Seeing Error: {e}. Exiting")
                        return "Fail"
 
@@ -195,31 +129,27 @@ def Creat_fullReport_and_trendAnalysis(fp):
 
 headers_list = ["Date", "expiryDate", "Symbol", "Type", "CMP", "strikePrice", 
                 "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR"]
-symbols=[]
-file_name = ""
-printstr = "\n--------------->>>>"
+symbols, file_name, printstr = [], "", "\n--------------->>>>"
+
 while True:
     ip = input(f"{printstr} Select: 1 - Holdings Symbols, 2 - All FnO Symbols, 3 - 300 Stocks (Nifty200, MidCap 100, SmallCap 100): ")
     if ip.strip() == "":
          print_msg(type="Warn", msg=f"{printstr} Wrong Selection.\n")
     elif 1 == int(ip):
         print(f"{printstr} Selected Holdings")
-        file_name = "MyHoldings_Opc.csv"
-        symbols=HLDNGS.copy()
+        symbols, file_name = HLDNGS.copy(), "MyHoldings_Opc.csv"
         break
     elif 2 == int(ip):
         print(f"{printstr} Selected All FnO Symbols")
-        file_name = "AllFnOStocks_Opc.csv"
-        symbols=sorted(fnolist())
+        symbols, file_name = sorted(fnolist()), "AllFnOStocks_Opc.csv"
         symbols.remove('NIFTY')
         symbols.remove('NIFTYIT')
-        symbols.remove('BANKNIFTY')
+        symbols.remove('BANKNIFTY')        
         break
     elif 3 == int(ip):
         print(f"{printstr} 300 Stocks (Nifty200, MidCap 100, SmallCap 100)")
         from allIndices import AllList
-        file_name = "Nifty200_MidCap100_SmallCap100.csv"
-        symbols = sorted(set(fnolist()) | set(AllList))
+        symbols, file_name = sorted(set(fnolist()) | set(AllList)) , "Nifty200_MidCap100_SmallCap100.csv"
         symbols.remove('NIFTY')
         symbols.remove('NIFTYIT')
         symbols.remove('BANKNIFTY')
@@ -235,9 +165,7 @@ else:
     print("unknown OS. Change code to use this")
     exit(0)
 
-fast=12
-slow=26
-sign=9
+fast, slow, sign = 12, 26, 9
 
 while True:
     ip = input(f"{printstr} Select MACD: 1 - 12,29,9 ---- 2 - 50,200,25 : ")
@@ -249,17 +177,14 @@ while True:
         break
     elif 2 == int(ip):
         print(f"{printstr} Selected MACD(50,200,25)")
-        fast = 50
-        slow = 200
-        sign = 25
-        days = 1000
+        fast, slow, sign, days = 50, 200, 25, 1000
         fp = fp.replace(".csv", "_MACD_50_200_25.csv")
         break
     else:
         print_msg(type="Warn", msg=f"{printstr} Wrong Selection.\n")
 
-md = 'w'
-header = True
+md, header = 'w', True
+
 while True:
     if os.path.exists(fp):
         ip=input(f"{printstr} File {fp} exists.\n\nDefault is Overwrite. Select 1 - to just append , 2 - to create a new file with timestamp: ")
@@ -270,8 +195,7 @@ while True:
         if ip.strip() == "":
              break
         elif int(ip) == 1:
-            md = 'a'
-            header = False
+            md, header = 'a', False
             break
         elif int(ip) == 2:
             fp = fp.replace(".csv", "_" + dt.datetime.now().strftime("%d-%b-%Y-%H-%M-%S") + ".csv")

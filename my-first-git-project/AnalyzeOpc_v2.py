@@ -217,13 +217,7 @@ while True:
         break
     elif 3 == int(ip):
         print(f"{printstr} 300 Stocks (Nifty200, MidCap 100, SmallCap 100)")
-        try:
-            from Backup.allIndices import AllList
-        except ImportError as e:
-            from allIndices import AllList
-        except:
-             print_msg(type="fail", msg="Could not impoprt the AllList. Existing")
-             exit(0)
+        from allIndices import AllList
         file_name = "Nifty200_MidCap100_SmallCap100.csv"
         symbols = sorted(set(fnolist()) | set(AllList))
         symbols.remove('NIFTY')

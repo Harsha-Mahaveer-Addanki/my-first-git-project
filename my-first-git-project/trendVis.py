@@ -135,7 +135,10 @@ def update_graph(selected_value, groupby):
                 "Support": "mean",
                 "Resistance": "mean",
                 "strikePrice": "mean",
-                "PCR": "mean"
+                "PCR": "mean",
+                "RSI" : "mean",
+                "BB_HI" : "mean",
+                "BB_LO" : "mean"
             })
         )
         data = group_data.sort_values("Date").reset_index(drop=True)
@@ -157,7 +160,10 @@ def update_graph(selected_value, groupby):
         ("Support", data["Support"], "green", "y", "dot"),
         ("Resistance", data["Resistance"], "red", "y", "dot"),
         ("Strike Price", data["strikePrice"], "olive", "y", "solid"),
-        ("PCR", data["PCR"], "orange", "y2", "solid")
+        ("PCR", data["PCR"], "orange", "y2", "solid"),
+#        ("RSI", data["RSI"], "orange", "y2", "solid"),
+        ("BB_HI", data["BB_HI"], "black", "y", "solid"),
+        ("BB_LO", data["BB_LO"], "black", "y", "solid")                       
     ]
 
     fig = go.Figure()
@@ -216,6 +222,26 @@ def update_graph(selected_value, groupby):
         hoverinfo="x+y+name"
     ))
 
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["BB_HI"],
+        name="BB_HI",
+        line=dict(color="black", dash="solid"),
+        yaxis="y",
+        hoverinfo="x+y+name",
+        fill=None  # lower line only
+    ))
+
+    # 2️⃣ Plot Resistance line with fill between it and Support
+    fig.add_trace(go.Scatter(
+        x=x_pos,
+        y=data["BB_LO"],
+        name="BB_LO",
+        line=dict(color="black", dash="solid"),
+        yaxis="y",
+        hoverinfo="x+y+name",
+        fill=None,  # fill between this and previous trace
+    ))
 
     annotations = [
         dict(
@@ -239,7 +265,7 @@ def update_graph(selected_value, groupby):
         plot_bgcolor="#f5f5f5",
         paper_bgcolor="#f5f5f5",
         font=dict(color="#333"),
-        yaxis=dict(title="CMP / Support / Resistance / Strike Price"),
+        yaxis=dict(title="CMP / Support / Resistance / Strike Price / BB_HI / BB_LO"),
         yaxis2=dict(title="PCR", overlaying="y", side="right"),
         showlegend=False,
         margin=dict(l=40, r=100, t=40, b=60),

@@ -32,41 +32,65 @@ def Creat_fullReport_and_trendAnalysis(fp, past_days=3):
     new_cols = []
     # Group by Symbol and compute difference
     for col in cols[4:]:
+#        if col in ["CMP", "Support", "Resistance", "BB_HI", "BB_MID", "BB_LO" ]:
         df[col + "_chg"] = df.groupby("Symbol")[col].diff(past_days)
         new_cols.append(col + "_chg")
         # Percentage difference over 3 rows
         df[col + "_pct_chg"] = df.groupby("Symbol")[col].transform(lambda x: x.diff(past_days) / x.shift(past_days) * 100)
         new_cols.append(col + "_pct_chg")
-        # Convert diff to trend labels
+    # Convert diff to trend labels
         df[col + "_trend"] = df[col + "_chg"].apply(lambda x: "up" if x > 0 else ("down" if x < 0 else "unchanged"))
         new_cols.append(col + "_trend")
 
     # --- Define conditions ---
     conditions = [
-        (df["Resistance"] > df["BB_HI"]) & (df["Support"] < df["BB_LO"]),   
-        (df["Resistance"] < df["BB_HI"]) & (df["Support"] > df["BB_LO"]),   
-        (df["Resistance"] > df["BB_HI"]) & (df["Support"] > df["BB_LO"]),   
-        (df["Resistance"] < df["BB_HI"]) & (df["Support"] < df["BB_LO"])   
+        (df["Resistance"] > df["BB_HI"]) & (df["Support"] > df["BB_HI"]),
+        (df["Resistance"] < df["BB_LO"]) & (df["Support"] < df["BB_LO"]),
+        (df["Resistance"] > df["BB_HI"]) & (df["Support"] < df["BB_LO"]),
+        (df["Resistance"] < df["BB_HI"]) & (df["Support"] > df["BB_LO"]),
+        (df["Resistance"] > df["BB_HI"]) & (df["Support"].between(df["BB_MID"], df["BB_HI"])),
+        (df["Resistance"] < df["BB_MID"]) & (df["Support"].between(df["BB_LO"], df["BB_MID"])),
+        (df["Resistance"] > df["BB_MID"]) & (df["Support"] < df["BB_MID"]),
     ]
 
-    # --- Define labels for each condition ---
     choices = [
-        "BB within Res-Support",
-        "BB outside Res-Support",
-        "Res-Sup above than BB_HI & LO",
-        "Res-Sup below than BB_HI & LO",
+        "Strong Uptrend (Both Above BB_HI)",
+        "Strong Downtrend (Both Below BB_LO)",
+        "Volatile Wide Range (BB within Res-Support)",
+        "Consolidation (Res-Sup Inside BB Range)",
+        "Moderate Uptrend (Sup Near BB_MID to BB_HI)",
+        "Moderate Downtrend (Sup Near BB_LO to BB_MID)",
+        "Neutral (BB_MID Between Res-Sup)",
     ]
 
-    # --- Apply conditions using np.select ---
-    df["BB-FnO"] = np.select(conditions, choices, default="BB Scattered")    
+    df["BB-FnO"] = np.select(conditions, choices, default="Mixed / Undefined")
+    """
+    trend_map = {
+        "Strong Uptrend (Both Above BB_HI)": 3,
+        "Moderate Uptrend (Sup Near BB_MID to BB_HI)": 2,
+        "Neutral (BB_MID Between Res-Sup)": 1,
+        "Consolidation (Res-Sup Inside BB Range)": 0,
+        "Moderate Downtrend (Sup Near BB_LO to BB_MID)": -2,
+        "Strong Downtrend (Both Below BB_LO)": -3,
+        "Volatile Wide Range (BB within Res-Support)": 99
+    }
+
+    df["Trend_Code"] = df["BB-FnO"].map(trend_map)
+    """
     cols.append("BB-FnO")
+    print(cols)
+ 
     final_order = []
     for c in cols:
         final_order.append(c)
-        if f"{c}_chg" in df.columns:
-            final_order.append(f"{c}_chg")
-            final_order.append(f"{c}_pct_chg")
+        if f"{c}_trend" in df.columns:
+            if c in ["CMP", "Support", "Resistance", "BB_HI", "BB_MID", "BB_LO" ]:
+                final_order.append(f"{c}_chg")
+                final_order.append(f"{c}_pct_chg")
             final_order.append(f"{c}_trend")
+    
+    print(final_order)
+
     df = df[final_order].round(2)
 
     while True:

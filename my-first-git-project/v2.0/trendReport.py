@@ -19,7 +19,7 @@ def is_file_locked(filepath):
 def Creat_fullReport_and_trendAnalysis(fp, past_days=3):
 
     df = pd.read_csv(fp, parse_dates=["Date"], date_format="%d-%b-%y")
-    fpa = fp.replace(".csv", "_trend_analysis_All.csv")
+    fpa = fp.replace(".csv", f"_trend_analysis_All_Past{past_days+1}days.csv")
 
     # Ensure data is sorted by Symbol and Date
     df.sort_values(by=["Symbol", "Date"], inplace=True)
@@ -107,5 +107,6 @@ def Creat_fullReport_and_trendAnalysis(fp, past_days=3):
     del df, cols, final_order, fpa, fp
 
 if __name__ == "__main__":
-    past_days = 2
-    Creat_fullReport_and_trendAnalysis("AllFnOStocks_Opc.csv", past_days=past_days)
+    past_days = 4
+    for past_days in [2, 4]:
+        Creat_fullReport_and_trendAnalysis("AllFnOStocks_Opc.csv", past_days=past_days)

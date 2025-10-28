@@ -4,6 +4,7 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 from util_lib import STOCK_INFO   # import your dict
+import sys
 
 # --- Initialize Dash ---
 app = dash.Dash(
@@ -14,8 +15,12 @@ app = dash.Dash(
 )
 server = app.server
 
+fp = "AllFnOStocks_Opc_trend_analysis_All.csv"
+if len(sys.argv) > 1:
+    fp = sys.argv[1]
+
 # --- Load CSV ---
-df = pd.read_csv("AllFnOStocks_Opc_trend_analysis_All.csv")
+df = pd.read_csv(fp)
 df["Date"] = pd.to_datetime(df["Date"])
 
 # --- Merge STOCK_INFO ---

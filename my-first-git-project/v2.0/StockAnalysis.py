@@ -133,7 +133,7 @@ def Stock_All_Data_Analysis():
         if not opcDict or not mktDict : continue
         FullDictList.append(opcDict | mktDict)
         print_msg(type="success", msg=f"Done with {symnum:>5} {symbol:<15}")
-        if symnum != len(AllList) : print_delay()
+        if symnum != len(AllList) : print_delay(3)
     print_msg(msg="\t\tTime End: " + datetime.now().strftime("%H:%M:%S"))
     del AllList, opcDict, mktDict
     return FullDictList
@@ -190,5 +190,4 @@ if __name__ == "__main__":
     slow, fast, sign = 26, 12, 9
 
     finaldict = Stock_All_Data_Analysis()
-    ip = input()
     Create_report(finaldict)

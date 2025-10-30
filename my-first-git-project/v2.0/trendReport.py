@@ -31,7 +31,7 @@ def Creat_fullReport_and_trendAnalysis(fp, past_days=3):
     cols = df.columns.to_list()
     new_cols = []
     # Group by Symbol and compute difference
-    for col in cols[4:]:
+    for col in cols[4:17]:
 #        if col in ["CMP", "Support", "Resistance", "BB_HI", "BB_MID", "BB_LO" ]:
         df[col + "_chg"] = df.groupby("Symbol")[col].diff(past_days)
         new_cols.append(col + "_chg")

@@ -82,6 +82,7 @@ def getOptionChainData(symbol):
 
                 df = pd.json_normalize(opcdata['filtered']['data'])[hdl]
                 df.dropna(subset=["PE.openInterest", "CE.openInterest"], inplace=True)
+                df = df[(df["PE.openInterest"] != 0) & (df["PE.lastPrice"] != 0) & (df["CE.openInterest"] != 0) & (df["CE.lastPrice"] != 0)]
                 df.loc[:, "TotalOI"] = df.loc[:, "PE.openInterest"] + df.loc[:, "CE.openInterest"]
                 max_row = df.loc[df['TotalOI'].idxmax()].copy().to_dict()
                 max_row["Date"] = formatted_date

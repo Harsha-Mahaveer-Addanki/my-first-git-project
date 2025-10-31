@@ -80,7 +80,34 @@ def getOptionChainData(symbol):
                 opcdata = NL.equities_option_chain(symbol)
                 pbar.update(1)
 
-                df = pd.json_normalize(opcdata['filtered']['data'])[hdl]
+                df = pd.json_normalize(opcdata['filtered']['data'])
+
+                Call_B = len(df[(df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] > 0)])
+                Call_S = len(df[(df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] > 0)])
+                Puts_W = len(df[(df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] < 0)])
+                Puts_L = len(df[(df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] < 0)])
+                
+                Call_W = len(df[(df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] < 0)])
+                Call_L = len(df[(df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] < 0)])
+                Puts_B = len(df[(df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] > 0)])
+                Puts_S = len(df[(df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] > 0)])
+
+                sentDict = {
+                    "Sentiment" : "Bullish" if (Call_B + Call_S + Puts_W + Puts_L) > (Call_W + Call_L + Puts_B + Puts_S) else "Bearish",
+                    "Call_B":   Call_B,
+                    "Call_S":   Call_S,
+                    "Puts_W":   Puts_W,
+                    "Puts_L":   Puts_L,
+                    
+                    "Call_W":   Call_W,
+                    "Call_L":   Call_L,
+                    "Puts_B":   Puts_B,
+                    "Puts_S":   Puts_S,
+
+                    "Tot_Strikes": len(df['strikePrice']),
+                }
+
+                df = df[hdl]
                 df.dropna(subset=["PE.openInterest", "CE.openInterest"], inplace=True)
                 df = df[(df["PE.openInterest"] != 0) & (df["PE.lastPrice"] != 0) & (df["CE.openInterest"] != 0) & (df["CE.lastPrice"] != 0)]
                 df.loc[:, "TotalOI"] = df.loc[:, "PE.openInterest"] + df.loc[:, "CE.openInterest"]
@@ -99,7 +126,7 @@ def getOptionChainData(symbol):
                     max_row.pop(key, None)
                 pbar.update(1)
                 #print(max_row)
-                return max_row
+                return max_row, sentDict
          
          except Exception as e:
             attempt += 1
@@ -108,7 +135,7 @@ def getOptionChainData(symbol):
                 sleep(5 * (2 ** attempt))
             else:
                 print_msg(type="fail", msg=f"Max tries of {max_retries} reached in function getOptionChainData(). Seeing Error: {e}. Exiting")
-                return {}             
+                return {} , {}            
 
 def print_delay(delay=5):
     print("Waiting", end="", flush=True)
@@ -126,16 +153,19 @@ def getFnOStkList():
 def Stock_All_Data_Analysis():
     AllList = getFnOStkList()
     FullDictList = []
+    global headers_list
     print_msg(msg="\t\tTime Start: " + datetime.now().strftime("%H:%M:%S"))
     for symnum, symbol in enumerate(AllList, start=1):
         opcDict = mktDict = {}
-        opcDict = getOptionChainData(symbol=symbol)
+        opcDict, mySentDict = getOptionChainData(symbol=symbol)
         mktDict = getMarketData(symbol)
         if not opcDict or not mktDict : continue
-        FullDictList.append(opcDict | mktDict)
+        FullDictList.append(opcDict | mktDict | mySentDict)
         print_msg(type="success", msg=f"Done with {symnum:>5} {symbol:<15}")
         if symnum != len(AllList) : print_delay(3)
     print_msg(msg="\t\tTime End: " + datetime.now().strftime("%H:%M:%S"))
+    for k in mySentDict.keys():
+        headers_list.append(k)
     del AllList, opcDict, mktDict
     return FullDictList
 

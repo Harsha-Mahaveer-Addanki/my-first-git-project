@@ -8,7 +8,7 @@ from multiprocessing import Pool
 from ta.momentum import RSIIndicator
 from ta.trend import MACD
 from ta.volatility import BollingerBands
-import sys, os
+import sys, os, sqlite3
 from jugaad_data.nse import NSELive
 
 past_days = 2
@@ -70,17 +70,32 @@ def getMarketData(symbol):
                 print_msg(type="fail", msg=f"Max tries of {max_retries} reached in function getMarketData(). Seeing Error: {e}. Exiting")
                 return {}        
      
-def getOptionChainData(symbol):
+def getOptionChainData(symbol, conn, cursor):
     max_retries = 2
     attempt = 0
     while attempt < max_retries:
          try:
-            with tqdm(total=2, desc="Pipeline Progress", unit="step", leave=False) as pbar:
+            with tqdm(total=3, desc="Pipeline Progress", unit="step", leave=False) as pbar:
                 #symbol = nsesymbolpurify(symbol=symbol)
                 opcdata = NL.equities_option_chain(symbol)
                 pbar.update(1)
 
                 df = pd.json_normalize(opcdata['filtered']['data'])
+
+                dbdf = df.copy()
+                dbdf['Symbol'] = symbol
+                dbdf['Date'] = formatted_date
+
+                # Write to temporary table
+                dbdf[hd_list].to_sql("temp_table", conn, if_exists='replace', index=False)
+
+                # Insert only new rows into main table
+                cursor.execute(f'''
+                    INSERT OR IGNORE INTO {table_name}
+                    SELECT * FROM temp_table
+                ''')
+                conn.commit()
+                pbar.update(1)
 
                 Call_B = len(df[(df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] > 0)])
                 Call_S = len(df[(df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] > 0)])
@@ -126,6 +141,7 @@ def getOptionChainData(symbol):
                     max_row.pop(key, None)
                 pbar.update(1)
                 #print(max_row)
+                del df, dbdf
                 return max_row, sentDict
          
          except Exception as e:
@@ -151,13 +167,55 @@ def getFnOStkList():
     return AllList
 
 def Stock_All_Data_Analysis():
+
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    print_msg("info", f"\n✅ Connected to SQLite DB: {os.path.abspath(db_path)}")
+
+    # ---------- Create table if not exists ----------
+    cursor.execute(f'''
+    CREATE TABLE IF NOT EXISTS {table_name} (
+        Date TEXT,
+        Symbol TEXT,
+        expiryDate TEXT,
+        "CE.underlying" TEXT,
+        "CE.openInterest" REAL,
+        "CE.changeinOpenInterest" REAL,
+        "CE.pchangeinOpenInterest" REAL,
+        "CE.totalTradedVolume" REAL,
+        "CE.impliedVolatility" REAL,
+        "CE.lastPrice" REAL,
+        "CE.change" REAL,
+        "CE.pChange" REAL,
+        "CE.underlyingValue" REAL,
+        strikePrice REAL,
+        "PE.openInterest" REAL,
+        "PE.changeinOpenInterest" REAL,
+        "PE.pchangeinOpenInterest" REAL,
+        "PE.totalTradedVolume" REAL,
+        "PE.impliedVolatility" REAL,
+        "PE.lastPrice" REAL,
+        "PE.change" REAL,
+        "PE.pChange" REAL,
+        "PE.underlyingValue" REAL,
+        UNIQUE(Symbol, Date, strikePrice)
+    )
+    ''')
+    conn.commit()
+
+    # Add an index for faster lookups
+    cursor.execute(f"CREATE INDEX IF NOT EXISTS idx_symbol_date ON {table_name}(Symbol, Date)")
+    conn.commit()
+
+
     AllList = getFnOStkList()
     FullDictList = []
     global headers_list
     print_msg(msg="\t\tTime Start: " + datetime.now().strftime("%H:%M:%S"))
     for symnum, symbol in enumerate(AllList, start=1):
         opcDict = mktDict = {}
-        opcDict, mySentDict = getOptionChainData(symbol=symbol)
+        opcDict, mySentDict = getOptionChainData(symbol=symbol, conn=conn, cursor=cursor)
         mktDict = getMarketData(symbol)
         if not opcDict or not mktDict : continue
         FullDictList.append(opcDict | mktDict | mySentDict)
@@ -167,6 +225,8 @@ def Stock_All_Data_Analysis():
     for k in mySentDict.keys():
         headers_list.append(k)
     del AllList, opcDict, mktDict
+    conn.close()
+
     return FullDictList
 
 def is_file_locked(filepath):
@@ -204,11 +264,22 @@ def Create_report(FullDictList):
 if __name__ == "__main__":
     NL = NSELive()
     formatted_date = datetime.now().strftime("%d-%b-%Y")
+
+    db_path = "NSE_FnO_Stocks_OPC.db"
+    table_name = "FnO_Option_Chain"
+
     hdl = ['PE.openInterest', 'CE.openInterest', 'strikePrice', 'PE.lastPrice', 'CE.lastPrice']
     HLDNGS = ["ABB", "BEL", "BSE", "CAMS", "CDSL", "CGPOWER", "COALINDIA", "IEX", "INDIGO", "IRCTC", "KFINTECH", "MCX","MOTHERSON", "PFC", "POWERGRID", "SIEMENS"]
     headers_list = ["Date", "expiryDate", "Symbol", "Type", "CMP", "strikePrice", 
                     "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR",
                     "RSI", "MACD", "MACD_Signal", "MACD_Hist", "BB_HI", "BB_MID", "BB_LO"]    
+
+    hd_list = ['Date', 'Symbol', 'expiryDate', 'CE.underlying', 'CE.openInterest', 'CE.changeinOpenInterest',
+           'CE.pchangeinOpenInterest', 'CE.totalTradedVolume', 'CE.impliedVolatility', 'CE.lastPrice',
+           'CE.change', 'CE.pChange', 'CE.underlyingValue', 'strikePrice', 'PE.openInterest',
+           'PE.changeinOpenInterest', 'PE.pchangeinOpenInterest', 'PE.totalTradedVolume', 'PE.impliedVolatility',
+           'PE.lastPrice', 'PE.change', 'PE.pChange', 'PE.underlyingValue']
+
     indicator_map = {
     "rsi": "RSI",
     "hband": "BB_HI",

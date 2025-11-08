@@ -108,7 +108,7 @@ def getOptionChainData(symbol, conn, cursor):
                 Puts_S = ((df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] > 0)).sum()
 
                 sentDict = {
-                    "Sentiment" : "Bullish" if (Call_B + Call_S + Puts_W + Puts_L) > (Call_W + Call_L + Puts_B + Puts_S) else "Bearish",
+                    "Sentiment" : "Bullish" if ((Call_B + Call_S + Puts_W + Puts_L) > (Call_W + Call_L + Puts_B + Puts_S)) and ((Call_B + Puts_W) > (Call_S + Puts_L)) and (Puts_W > Call_B)  else "Bearish",
                     "Call_B":   Call_B,
                     "Call_S":   Call_S,
                     "Puts_W":   Puts_W,

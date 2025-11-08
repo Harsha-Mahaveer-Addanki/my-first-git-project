@@ -97,15 +97,15 @@ def getOptionChainData(symbol, conn, cursor):
                 conn.commit()
                 pbar.update(1)
 
-                Call_B = len(df[(df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] > 0)])
-                Call_S = len(df[(df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] > 0)])
-                Puts_W = len(df[(df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] < 0)])
-                Puts_L = len(df[(df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] < 0)])
+                Call_B = ((df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] > 0)).sum()
+                Call_S = ((df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] > 0)).sum()
+                Puts_W = ((df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] < 0)).sum()
+                Puts_L = ((df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] < 0)).sum()
                 
-                Call_W = len(df[(df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] < 0)])
-                Call_L = len(df[(df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] < 0)])
-                Puts_B = len(df[(df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] > 0)])
-                Puts_S = len(df[(df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] > 0)])
+                Call_W = ((df['CE.changeinOpenInterest'] > 0) & (df['CE.change'] < 0)).sum()
+                Call_L = ((df['CE.changeinOpenInterest'] < 0) & (df['CE.change'] < 0)).sum()
+                Puts_B = ((df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] > 0)).sum()
+                Puts_S = ((df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] > 0)).sum()
 
                 sentDict = {
                     "Sentiment" : "Bullish" if (Call_B + Call_S + Puts_W + Puts_L) > (Call_W + Call_L + Puts_B + Puts_S) else "Bearish",

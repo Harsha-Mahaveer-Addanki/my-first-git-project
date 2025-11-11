@@ -69,7 +69,34 @@ def getMarketData(symbol):
             else:
                 print_msg(type="fail", msg=f"Max tries of {max_retries} reached in function getMarketData(). Seeing Error: {e}. Exiting")
                 return {}        
-     
+
+
+def analyze_row(row):
+
+    # 1️⃣ Overall activity comparison
+    if (row["Call_B"] + row["Call_S"] + row["Puts_W"] + row["Puts_L"]) > (row["Call_W"] + row["Call_L"] + row["Puts_B"] + row["Puts_S"]):
+        # 2️⃣ Buying/Writing balance
+        if (row["Call_B"] + row["Puts_W"]) > (row["Call_S"] + row["Puts_L"]):
+            # 3️⃣ Put writing vs Call buying
+            if row["Puts_W"] > row["Call_B"]:
+                sentiment_score = "6 - Very Bullish"
+            else:
+                sentiment_score = "5 - Bullish"
+        else:
+            sentiment_score = "4 - Mild Bullish"
+    else:
+        if (row["Call_B"] + row["Puts_W"]) > (row["Call_S"] + row["Puts_L"]):
+            # 3️⃣ Put writing vs Call buying
+            if row["Puts_W"] > row["Call_B"]:
+                sentiment_score = "3 - Mild Bearish"
+            else:
+                sentiment_score = "2 - Bearish"
+        else:
+            sentiment_score = "1 - Very Bearish"
+
+    return sentiment_score
+
+
 def getOptionChainData(symbol, conn, cursor):
     max_retries = 2
     attempt = 0
@@ -107,8 +134,20 @@ def getOptionChainData(symbol, conn, cursor):
                 Puts_B = ((df['PE.changeinOpenInterest'] > 0) & (df['PE.change'] > 0)).sum()
                 Puts_S = ((df['PE.changeinOpenInterest'] < 0) & (df['PE.change'] > 0)).sum()
 
+                row = {
+                    "Call_B":   Call_B,
+                    "Call_S":   Call_S,
+                    "Puts_W":   Puts_W,
+                    "Puts_L":   Puts_L,
+                    
+                    "Call_W":   Call_W,
+                    "Call_L":   Call_L,
+                    "Puts_B":   Puts_B,
+                    "Puts_S":   Puts_S,
+                }
+
                 sentDict = {
-                    "Sentiment" : "Bullish" if ((Call_B + Call_S + Puts_W + Puts_L) > (Call_W + Call_L + Puts_B + Puts_S)) and ((Call_B + Puts_W) > (Call_S + Puts_L)) and (Puts_W > Call_B)  else "Bearish",
+                    "Sentiment" : analyze_row(row),
                     "Call_B":   Call_B,
                     "Call_S":   Call_S,
                     "Puts_W":   Puts_W,
@@ -121,6 +160,7 @@ def getOptionChainData(symbol, conn, cursor):
 
                     "Tot_Strikes": len(df['strikePrice']),
                 }
+                del row
 
                 df = df[hdl]
                 df.dropna(subset=["PE.openInterest", "CE.openInterest"], inplace=True)

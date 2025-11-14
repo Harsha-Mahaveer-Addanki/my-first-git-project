@@ -59,38 +59,18 @@ def getStats(df):
         "Tot_Strikes": len(df['strikePrice']),
     }
 
-def analyze_row(row, sentiment_score):
-
-    # 1️⃣ Overall activity comparison
-    if (row["Call_B"] + row["Call_S"] + row["Puts_W"] + row["Puts_L"]) > (row["Call_W"] + row["Call_L"] + row["Puts_B"] + row["Puts_S"]):
-        # 2️⃣ Buying/Writing balance
-        if (row["Call_B"] + row["Puts_W"]) > (row["Call_S"] + row["Puts_L"]):
-            # 3️⃣ Put writing vs Call buying
-            if row["Puts_W"] > row["Call_B"]:
-                sentiment_score += 6 # "6 - Very Bullish"
-            else:
-                sentiment_score += 5 # "5 - Bullish"
-        else:
-            sentiment_score += 4 # "4 - Mild Bullish"
-    else:
-        if (row["Call_B"] + row["Puts_W"]) > (row["Call_S"] + row["Puts_L"]):
-            # 3️⃣ Put writing vs Call buying
-            if row["Puts_W"] > row["Call_B"]:
-                sentiment_score += 3 # "3 - Mild Bearish"
-            else:
-                sentiment_score += 2 # "2 - Bearish"
-        else:
-            sentiment_score += 1 # "1 - Very Bearish"
-
-    return sentiment_score
-
-def condCheck(below_cmp, above_cmp):
+def condCheck(below_cmp, above_cmp, combined):
     ss = 0
     conditions = [
         below_cmp['Puts_W'] > above_cmp['Call_L'],
         below_cmp['Call_W'] < above_cmp['Call_W'],
         below_cmp['Puts_W'] > above_cmp['Puts_W'],
-        above_cmp["Call_B"] > below_cmp['Call_B']
+        above_cmp["Call_B"] > below_cmp['Call_B'],
+        (combined["Call_B"] + combined["Call_S"] + combined["Puts_W"] + combined["Puts_L"]) > (combined["Call_W"] + combined["Call_L"] + combined["Puts_B"] + combined["Puts_S"]),
+        (combined["Call_B"] + combined["Puts_W"]) > (combined["Call_S"] + combined["Puts_L"]),
+        combined["Puts_W"] > combined["Call_B"],
+        combined["Puts_W"] > combined["Puts_B"],
+        combined["Call_B"] > combined["Call_W"]
     ]
 
     ss += sum(conditions)
@@ -98,32 +78,17 @@ def condCheck(below_cmp, above_cmp):
 
 def analyzeSymbolOpc(symbol, df):
     cmp = df['CE.underlyingValue'].dropna().iloc[0]
-#    print(df)
     
     below_cmp = getStats(df[df.strikePrice < cmp])
     above_cmp = getStats(df[df.strikePrice > cmp])
     combined = {k: below_cmp[k] + above_cmp[k] for k in below_cmp}
 
-    """
-    ss = 0
-    if (below_cmp['Puts_W'] > above_cmp['Call_L']):
-        ss += 1
-    
-    if (below_cmp['Call_W'] < above_cmp['Call_W']):
-        ss +=1
-
-    if (below_cmp['Puts_W'] > above_cmp['Puts_W']):
-        ss +=1
-    """
-    ss = condCheck(below_cmp, above_cmp)
-    ss = analyze_row(combined, ss)
+    ss = condCheck(below_cmp, above_cmp, combined)
 
     return {"Symbol" : symbol,
             "Type" : "Holding" if symbol in HLDNGS else "Non-Hld", 
             "Sentiment" : ss
             }
-
-    print(f"{symbol:>15} Puts_W below CMP {below_cmp['Puts_W']:>3} Call_L above CMP {above_cmp['Call_L']:>3}")
 
 if __name__ == "__main__":
 

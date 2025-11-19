@@ -58,6 +58,16 @@ def getMarketData(symbol):
             pbar.update(1)
 
             dfc = pd.concat(results, axis=1).round(2)
+            #dfc["Dist_from_BB_HI"] = dfc.apply(lambda x: round(((x["BB_HI"] - df["Close"].iloc[-1])/df["Close"].iloc[-1])*100, 2))
+            #dfc["Dist_from_BB_LO"] = dfc.apply(lambda x: round(((df["Close"].iloc[-1] - x["BB_LO"])/x["BB_LO"])*100, 2))
+
+
+            last_close = df["Close"].iloc[-1]
+
+            dfc["Dist_from_BB_HI"] = ((dfc["BB_HI"] - last_close) / last_close * 100).round(2)
+            dfc["Dist_from_BB_LO"] = ((last_close - dfc["BB_LO"]) / dfc["BB_LO"] * 100).round(2)
+
+
             pbar.update(1)
             del symbol, df, tasks, pbar, results, 
             return dfc.iloc[-1].to_dict()

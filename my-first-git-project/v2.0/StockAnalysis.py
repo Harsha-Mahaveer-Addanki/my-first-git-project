@@ -61,12 +61,10 @@ def getMarketData(symbol):
             #dfc["Dist_from_BB_HI"] = dfc.apply(lambda x: round(((x["BB_HI"] - df["Close"].iloc[-1])/df["Close"].iloc[-1])*100, 2))
             #dfc["Dist_from_BB_LO"] = dfc.apply(lambda x: round(((df["Close"].iloc[-1] - x["BB_LO"])/x["BB_LO"])*100, 2))
 
-
             last_close = df["Close"].iloc[-1]
 
-            dfc["Dist_from_BB_HI"] = ((dfc["BB_HI"] - last_close) / last_close * 100).round(2)
-            dfc["Dist_from_BB_LO"] = ((last_close - dfc["BB_LO"]) / dfc["BB_LO"] * 100).round(2)
-
+            dfc["Dist_from_BB_HI"] = ((dfc["hband"] - last_close) / last_close * 100).round(2)
+            dfc["Dist_from_BB_LO"] = ((last_close - dfc["lband"]) / dfc["lband"] * 100).round(2)
 
             pbar.update(1)
             del symbol, df, tasks, pbar, results, 
@@ -265,8 +263,8 @@ def Stock_All_Data_Analysis():
     print_msg(msg="\t\tTime Start: " + datetime.now().strftime("%H:%M:%S"))
     for symnum, symbol in enumerate(AllList, start=1):
         opcDict = mktDict = {}
-        opcDict, mySentDict = getOptionChainData(symbol=symbol, conn=conn, cursor=cursor)
         mktDict = getMarketData(symbol)
+        opcDict, mySentDict = getOptionChainData(symbol=symbol, conn=conn, cursor=cursor)
         if not opcDict or not mktDict : continue
         FullDictList.append(opcDict | mktDict | mySentDict)
         print_msg(type="success", msg=f"Done with {symnum:>5} {symbol:<15}")

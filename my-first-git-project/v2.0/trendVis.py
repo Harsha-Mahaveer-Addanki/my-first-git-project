@@ -274,7 +274,7 @@ def update_graph(selected_value, groupby):
         yaxis2=dict(title="PCR", overlaying="y", side="right"),
         showlegend=False,
         margin=dict(l=40, r=100, t=40, b=60),
-        annotations=annotations,
+        #annotations=annotations,
         hovermode="x unified",
         autosize=True
     )

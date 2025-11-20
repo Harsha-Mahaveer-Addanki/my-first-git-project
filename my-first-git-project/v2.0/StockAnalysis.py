@@ -320,7 +320,7 @@ if __name__ == "__main__":
     HLDNGS = ["ABB", "BEL", "BSE", "CAMS", "CDSL", "CGPOWER", "COALINDIA", "IEX", "INDIGO", "IRCTC", "KFINTECH", "MCX","MOTHERSON", "PFC", "POWERGRID", "SIEMENS"]
     headers_list = ["Date", "expiryDate", "Symbol", "Type", "CMP", "strikePrice", 
                     "Support", "Dist_from_Support", "Resistance", "Dist_from_Resist", "PCR",
-                    "RSI", "MACD", "MACD_Signal", "MACD_Hist", "BB_HI", "BB_MID", "BB_LO"]    
+                    "RSI", "MACD", "MACD_Signal", "MACD_Hist", "BB_HI", "BB_MID", "BB_LO", "Dist_from_BB_HI", "Dist_from_BB_LO"]    
 
     hd_list = ['Date', 'Symbol', 'expiryDate', 'CE.underlying', 'CE.openInterest', 'CE.changeinOpenInterest',
            'CE.pchangeinOpenInterest', 'CE.totalTradedVolume', 'CE.impliedVolatility', 'CE.lastPrice',

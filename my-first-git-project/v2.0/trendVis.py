@@ -158,7 +158,8 @@ def update_graph(selected_value, groupby):
         return fig, "No data to display"
 
     x_pos = list(range(len(data)))
-    ticktext = [d.strftime("%d") if d.day != 1 else d.strftime("%d-%b") for d in data["Date"]]
+    #ticktext = [d.strftime("%d") if d.day != 1 else d.strftime("%d-%b") for d in data["Date"]]
+    ticktext = [d.strftime("%d-%b") for d in data["Date"]]
 
     traces = [
         ("CMP", data["CMP"], "blue", "y", "solid"),
